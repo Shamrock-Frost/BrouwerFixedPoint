@@ -16,15 +16,28 @@ noncomputable
 def const (n : ℕ) : topological_simplex n ⟶ topological_simplex (n + 1) :=
   simplex_category.to_Top.map (@simplex_category.mk_hom n (n+1) ⟨(λ x, 0), (λ _ _ _, refl _)⟩)
 
+-- Get the point (0, ..., 0, 1, 0, ..., 0)
 noncomputable
 def vertex (n : ℕ) (i : simplex_category.mk n) : topological_simplex n 
   := simplex_category.to_Top.map
         (@simplex_category.mk_hom 0 n
                                   ⟨(λ _, i), (λ _ _ _, refl _)⟩)
                                   ⟨(λ _, 1), by { dsimp [simplex_category.to_Top_obj],
-                                                  transitivity finset.sum {(0 : simplex_category.mk 0)}
-                                                                          (λ _ : simplex_category.mk 0, (1 : nnreal)),
-                                                  congr, simp }⟩
+                                                  apply finset.sum_eq_single_of_mem,
+                                                  exact finset.mem_univ 0,
+                                                  intros b h h', cases b with b bh, 
+                                                  exfalso, cases b, trivial, simp at bh, 
+                                                  assumption }⟩
+
+lemma topological_simplex.coord_le_one (n : ℕ) (i : simplex_category.mk n)
+  (x : topological_simplex n) : x.val i ≤ 1 :=
+begin
+  transitivity (finset.univ.sum x.val),
+  { rw ← finset.insert_erase (finset.mem_univ i),
+    rw finset.sum_insert (finset.not_mem_erase _ _),
+    exact le_self_add },
+  { exact le_of_eq x.property }
+end
 
 lemma topological_simplex.has_one_implies_eq_zero (n : ℕ) (i : simplex_category.mk n)
   (x : topological_simplex n) (h : x.val i = 1) : ∀ j, i ≠ j → x.val j = 0 :=
