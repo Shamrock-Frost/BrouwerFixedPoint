@@ -29,12 +29,13 @@ local attribute [instance]
 def q_map (n : ℕ) (t : unit_interval) (x : topological_simplex n) : topological_simplex (n + 1) :=
 ⟨λ k, if k = 0
       then unit_interval.to_nnreal t
-      else unit_interval.to_nnreal (unit_interval.symm t) * x.val (simplex_category.σ ⟨0, nat.zero_lt_succ n⟩ k),
+      else unit_interval.to_nnreal (unit_interval.symm t)
+      * x.val (simplex_category.σ 0 k),
 begin
   dsimp [simplex_category.to_Top_obj],
   rw finset.sum_ite,
   transitivity unit_interval.to_nnreal t
-             + finset.univ.sum (λ k : simplex_category.mk n, unit_interval.to_nnreal (unit_interval.symm t) * x.val k),
+             + finset.univ.sum (λ k, unit_interval.to_nnreal (unit_interval.symm t) * x.val k),
   { apply congr_arg2, 
     { rw finset.sum_const,
       transitivity 1 • unit_interval.to_nnreal t, 
@@ -43,54 +44,58 @@ begin
         existsi (0 : simplex_category.mk (n + 1)),
         ext, simp },
       { simp } },
-    { apply @finset.sum_bij nnreal (simplex_category.mk (n+1)) (simplex_category.mk n) _
-                            (finset.filter (λ (x : simplex_category.mk (n + 1)), ¬x = 0) finset.univ)
-                            finset.univ
-                            (λ j, unit_interval.to_nnreal (unit_interval.symm t) * x.val (simplex_category.σ ⟨0, nat.zero_lt_succ n⟩ j))
-                            (λ j, unit_interval.to_nnreal (unit_interval.symm t) * x.val j)
-                            (λ j _, simplex_category.σ ⟨0, nat.zero_lt_succ n⟩ j),
-      { intros, apply finset.mem_univ },
-      { intros j h, simp * at h ⊢ },
-      { intros j k hj hk h, cases j with j, cases k with k, 
-        cases j with j, { exfalso, simp at hj, assumption },
-        cases k with k, { exfalso, simp at hk, assumption },
-        ext, simp at ⊢ h, exact subtype.ext_iff.mp h },
-      { intros j _,
-        existsi (simplex_category.δ ⟨0, nat.zero_lt_succ _⟩ j),
-        cases j with j hj,
-        existsi (finset.mem_filter.mpr ⟨finset.mem_univ _, _⟩),
-        swap, intro h, apply nat.succ_ne_zero j, exact (subtype.ext_iff_val.mp h),
-        ext, reflexivity } } },
-  { transitivity (unit_interval.to_nnreal t) + unit_interval.to_nnreal (unit_interval.symm t) * 1,
+    { rw sum_over_n_simplices_eq, refl } },
+  { transitivity (unit_interval.to_nnreal t) + unit_interval.to_nnreal (unit_interval.symm t) * 1, 
     { congr, cases x with x hx, dsimp [simplex_category.to_Top_obj] at hx, rw ← hx,
       symmetry, simp,
       apply @map_sum nnreal _ nnreal _ _ (nnreal →+ nnreal) _ 
-                     (distrib_mul_action.to_add_monoid_hom nnreal (unit_interval.to_nnreal (unit_interval.symm t))) },
+                     (distrib_mul_action.to_add_monoid_hom nnreal (unit_interval.to_nnreal
+                                                                  (unit_interval.symm t))) },
     { cases t, simp [unit_interval.symm, unit_interval.to_nnreal] } }
 end⟩
 
+lemma q_map_on_zero (n : ℕ) (t : unit_interval) (x : topological_simplex n) 
+  : @coe_fn _ _ (simplex_category.to_Top_obj.has_coe_to_fun (simplex_category.mk (n + 1)))
+                (q_map n t x) 0 = unit_interval.to_nnreal t := rfl
+
+lemma q_map_on_nonzero (n : ℕ) (t : unit_interval) (x : topological_simplex n)
+  (k : simplex_category.mk (n + 1)) (h : k ≠ 0)
+  : @coe_fn _ _ (simplex_category.to_Top_obj.has_coe_to_fun (simplex_category.mk (n + 1))) 
+                (q_map n t x) k
+  = unit_interval.to_nnreal (unit_interval.symm t) * x.val (simplex_category.σ 0 k) :=
+  by { dsimp [q_map, coe_fn],
+       dsimp [simplex_category.to_Top_obj.has_coe_to_fun],
+       rw ite_eq_right_iff, intro, contradiction }
+
 lemma q_continuous (n : ℕ) : continuous (function.uncurry (q_map n)) :=
 begin
-  apply @continuous_subtype_mk (simplex_category.mk (n+1) → nnreal) (I × topological_simplex n) _ _ _
+  apply @continuous_subtype_mk (simplex_category.mk (n+1) → nnreal)
+                               (I × topological_simplex n) _ _ _
                                (λ p, (function.uncurry (q_map n) p).val)
                                (λ p, (function.uncurry (q_map n) p).property),
-  continuity,
-  cases i with i hi,
+  apply continuous_pi,
+  intro i, cases i with i hi,
   dsimp [function.uncurry, q_map],
   apply continuous_if_const; intro h,
-  { continuity },
+  { apply continuous.fst', exact unit_interval.to_nnreal_continuous },
   { cases i with i, trivial,
-    continuity,
-    have := @continuous.cod_restrict (I × topological_simplex n) ℝ _ _
-                                     (λ x, ((x.snd).val (simplex_category.σ 0 ⟨i.succ, hi⟩)).val)
-                                     (λ x, x ≥ 0) _ _,
-    swap 3, intro x,
-    simp, exact (x.snd.val (simplex_category.σ 0 ⟨i.succ, hi⟩)).property,
+    apply continuous.mul,
+    { apply continuous.comp, exact unit_interval.to_nnreal_continuous,
+      apply continuous.fst', exact unit_interval.continuous_symm },
+    have := @continuous.cod_restrict
+                (I × topological_simplex n) ℝ _ _
+                (λ x, (x.snd.val (simplex_category.σ 0 ⟨i.succ, hi⟩)).val)
+                (λ x, x ≥ 0) _
+                (λ x, (x.snd.val (simplex_category.σ 0 ⟨i.succ, hi⟩)).property),
     apply continuous.congr this,
     intro x, cases x, ext, refl,
-    apply @continuous.snd' _ _ _ _ _ _ (λ x : (topological_simplex n), (x.val (simplex_category.σ 0 ⟨i.succ, hi⟩)).val),
-    have : continuous (λ (x : simplex_category.mk n → nnreal), x (simplex_category.σ 0 ⟨i.succ, hi⟩)),
-    continuity,
+    apply @continuous.snd' _ _ _ _ _ _
+                          (λ x : (topological_simplex n),
+                              (x.val (simplex_category.σ 0 ⟨i.succ, hi⟩)).val),
+    apply continuous_induced_dom.comp,
+    have : continuous (λ (x : simplex_category.mk n → nnreal),
+                          x (simplex_category.σ 0 ⟨i.succ, hi⟩)),
+    apply continuous_apply,
     exact continuous.comp this continuous_subtype_val }
 end
 
@@ -104,64 +109,23 @@ begin
     rw subtype.ext_iff_val at H,
     exfalso, 
     exact nat.succ_ne_zero _ H },
-  { simp [q_map, inclusion],
-    dsimp [coe_fn, simplex_category.to_Top_obj.has_coe_to_fun],
-    split_ifs,
-    { exfalso, apply nat.succ_ne_zero, exact congr_arg subtype.val h },
-    { dsimp [unit_interval.to_nnreal], transitivity, apply one_mul,
-      transitivity, symmetry, 
-      apply @finset.sum_singleton _ _ _ x,
-      congr, symmetry, rw finset.eq_singleton_iff_unique_mem,
-      split,
-      { rw finset.mem_filter, split, apply finset.mem_univ,
-        apply subtype.eq,
-        destruct (simplex_category.σ 0 ⟨j.succ, hj⟩),
-        intros y hy H,
-        transitivity (simplex_category.δ 0 (simplex_category.σ 0 ⟨j.succ, hj⟩)).val,
-        refl,
-        rw H,
-        transitivity y.succ, refl,
-        symmetry, exact congr_arg nat.succ (congr_arg subtype.val H) },
-      { intros x hx, cases x with x hx', ext,
-        simp at hx,
-        transitivity j,
-        refine (@nat.succ_inj' x j).mp _,
-        refine eq.trans _ (subtype.ext_iff_val.mp hx),
-        refl,
-        refl } } }
+  { rw q_map_on_nonzero,
+    simp [inclusion],
+    symmetry, apply finset.sum_eq_single_of_mem,
+    { simp, ext, refl },
+    { intros b hb H,
+      exfalso,
+      cases b with b hb',
+      simp at hb,
+      apply H, rw ← hb,
+      refl },
+    { intro H, apply nat.succ_ne_zero j, apply congr_arg subtype.val H } }
 end
 
 lemma q_map_one_left (n : ℕ) (x : topological_simplex n)
   : q_map n 1 x = const n x :=
 begin
-  ext j, destruct j, intros j' hj H, cases j' with j', 
-  { subst H,
-    transitivity (1 : ℝ), refl,
-    simp [const],
-    transitivity (finset.univ.sum x.val).val, symmetry,
-    transitivity (1 : nnreal).val, congr, exact x.property, refl,
-    congr, ext, rw finset.mem_filter,
-    simp, refl },
-  { simp [q_map, const], transitivity (0 : nnreal), 
-    { transitivity ite (j = 0) (unit_interval.to_nnreal 1) (unit_interval.to_nnreal 0 * x.val (simplex_category.σ 0 j)), 
-      refl,
-      rw ite_eq_iff, right,
-      split, 
-      { intro h, apply nat.succ_ne_zero j',
-        transitivity j.val,
-        symmetry, exact congr_arg subtype.val H,
-        exact congr_arg subtype.val h },
-      { simp, left, refl } },
-    { transitivity finset.empty.sum x.val,
-      symmetry, exact finset.sum_empty,
-      congr,
-      symmetry, apply finset.eq_empty_of_forall_not_mem,
-      intros k hk,
-      simp at hk,
-      apply nat.succ_ne_zero j', symmetry,
-      transitivity j.val,
-      rw ← hk, refl,
-      rw H } }
+  rw const_desc, apply eq_vertex, refl
 end
 
 def q (n : ℕ) : continuous_map.homotopy (inclusion n) (const n) := {
@@ -171,39 +135,78 @@ def q (n : ℕ) : continuous_map.homotopy (inclusion n) (const n) := {
   map_one_left' := q_map_one_left n
 }
 
+lemma q_surj (n : ℕ) : function.surjective (function.uncurry (q_map n)) :=
+begin
+  intro x,
+  by_cases (x.val 0 = 1),
+  { existsi ((1 : unit_interval), vertex n 0),
+    dsimp [function.uncurry],
+    rw q_map_one_left,
+    symmetry,
+    rw const_desc,
+    apply eq_vertex,
+    assumption },
+  { have denom_pos : 0 < 1 - (x.val 0).val,
+    { rw [lt_sub, sub_zero],
+      apply lt_of_le_of_ne,
+      apply topological_simplex.coord_le_one,
+      intro h', apply h,
+      simp at h', exact h' },
+    have denom_desc : ↑ (1 - x.val 0) = 1 - (x.val 0).val,
+    { rw [nnreal.sub_def],
+      apply real.coe_to_nnreal,
+      apply le_of_lt, apply denom_pos },
+    have denom_nonzero : 1 - x.val 0 ≠ 0,
+    { intro h, replace h := congr_arg coe h, 
+      rw denom_desc at h,
+      apply ne_of_lt denom_pos,
+      rw h, refl },
+    let t : unit_interval := ⟨x.val 0, (x.val 0).property, topological_simplex.coord_le_one _ _ _⟩,
+    let y' : simplex_category.mk n → nnreal := λ i, x.val (i + 1) / (1 - x.val 0),
+    have : finset.univ.sum y' = 1,
+    { rw ← div_self denom_nonzero,
+      rw eq_div_iff denom_nonzero,
+      rw finset.sum_mul,
+      apply nnreal.eq,
+      rw denom_desc,
+      rw eq_sub_iff_add_eq,
+      rw [← nnreal.coe_to_real_hom, map_sum, nnreal.coe_to_real_hom],
+      transitivity ↑(finset.univ.sum x.val),
+      { rw [← nnreal.coe_to_real_hom, map_sum, nnreal.coe_to_real_hom],
+        rw ← finset.insert_erase (finset.mem_univ (0 : simplex_category.mk (n+1))),
+        rw finset.sum_insert (finset.not_mem_erase _ _),
+        rw add_comm, 
+        apply congr_arg2, refl,
+        rw sum_over_n_simplices_eq,
+        apply finset.sum_congr,
+        { ext, rw finset.mem_filter, simp },
+        { intros k hk,
+          rw finset.mem_erase at hk, simp at hk,
+          rw div_mul_cancel _ denom_nonzero,
+          congr,
+          symmetry, transitivity, symmetry, exact succ_sigma_of_nonzero n k hk,
+          simp } },
+      rw (_ : finset.univ.sum x.val = 1), refl, 
+      exact x.property },
+    let y : topological_simplex n := ⟨y', this⟩,
+    existsi (t, y),
+    dsimp [function.uncurry],
+    ext k,
+    by_cases (k = 0),
+    { rw h, refl },
+    { rw q_map_on_nonzero _ _ _ _ h,
+      simp [y, unit_interval.symm, unit_interval.to_nnreal],
+      rw [← @subtype.val_eq_coe _ _ x, denom_desc, mul_comm,
+          ← nnreal.val_eq_coe (x.val 0), div_mul_cancel _ (ne.symm (ne_of_lt denom_pos))],
+      congr,
+      apply succ_sigma_of_nonzero, assumption } }
+end
+
 lemma q_quot (n : ℕ) : quotient_map (function.uncurry (q_map n)) := 
 begin
-  apply quotient_map_of_is_closed_map,
-  { intro x,
-    by_cases (x.val 0 = 1), admit,
-    -- { existsi ((1 : unit_interval), vertex n 0),
-    --   ext j, apply congr_arg, destruct j, intros j' hj H,
-    --   rw q_map_one_left,
-    --   simp [const],
-    --   cases j',
-    --   { subst H, transitivity (1 : nnreal),
-    --     transitivity finset.univ.sum (vertex n 0).val,
-    --     { congr, ext, simp, refl },
-    --     exact (vertex n 0).property,
-    --     symmetry, exact h },
-    --   { symmetry, transitivity,
-    --     apply topological_simplex.has_one_implies_eq_zero (n+1) 0 x h j,
-    --     { intro h', apply nat.succ_ne_zero j', symmetry, rw H at h', exact congr_arg subtype.val h' },
-    --     { transitivity (∅ : finset (simplex_category.mk n)).sum (vertex n 0).val,
-    --       symmetry, apply finset.sum_empty,
-    --       congr,
-    --       ext, simp,
-    --       intro h', have : 0 = j := h',
-    --       rw H at this, apply nat.succ_ne_zero j',
-    --       symmetry, exact congr_arg subtype.val this } } },
-    { let t := x.val 0,
-      -- todo: need to convert t to a unit_interval, so we want 
-      -- topological_simplex.eval : topological_simplex n → simplex_category.mk n → unit_interval
-      -- and the map topological_simplex (n + 1) → topological_simplex n which drops the first coord
-      -- and put this together to get t : unit_interval and x : topological_simplex n to (t, x/t)
-      admit } },
-  { apply @CompHaus.is_closed_map (CompHaus.of unit_interval) (CompHaus.of (topological_simplex n).α) ⟨function.uncurry (q_map n), sorry⟩,
-     }
+  apply surjection_of_compact_hausdorff_is_quot_map,
+  apply q_surj,
+  apply q_continuous
 end
 
 -- lemma singular_homology.homotopy_invariant (n : ℕ) (X Y : Top) (f g : X ⟶ Y) 

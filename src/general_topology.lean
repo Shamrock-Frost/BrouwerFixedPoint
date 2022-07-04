@@ -1,4 +1,5 @@
 import topology.constructions
+import topology.separation
 
 lemma quotient_map_of_is_closed_map {α β} [topological_space α] [topological_space β] 
   (f : α → β) : function.surjective f → is_closed_map f → continuous f → quotient_map f :=
@@ -16,3 +17,10 @@ begin
     { symmetry, apply set.image_preimage_eq_of_subset,
       rw hS.range_eq, apply set.subset_univ } }
 end
+
+lemma surjection_of_compact_hausdorff_is_quot_map {α β} [topological_space α] [topological_space β]
+  [compact_space α] [t2_space β]
+  (f : α → β) : function.surjective f → continuous f → quotient_map f :=
+λ hSurj hCont, quotient_map_of_is_closed_map f hSurj
+                                             (λ C hC, (hC.is_compact.image hCont).is_closed)
+                                             hCont

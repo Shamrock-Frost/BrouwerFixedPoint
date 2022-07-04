@@ -55,11 +55,14 @@ instance (n : ℕ) : compact_space (topological_simplex n) :=
       linarith }
 }⟩
 
+instance (n : ℕ) : t2_space (topological_simplex n) := subtype.t2_space
+
 def unit_interval.to_nnreal : unit_interval → nnreal := λ t, ⟨t.val, unit_interval.nonneg t⟩
 
 @[continuity]
 lemma unit_interval.to_nnreal_continuous : continuous unit_interval.to_nnreal :=
 continuous_inclusion (λ x hx, and.left hx)
 
-instance : has_coe_to_sort unit_interval nnreal := ⟨unit_interval.to_nnreal⟩
+@[simp] lemma unit_interval.to_nnreal_zero : unit_interval.to_nnreal 0 = 0 := rfl
 
+@[simp] lemma unit_interval.to_nnreal_one : unit_interval.to_nnreal 1 = 1 := rfl
