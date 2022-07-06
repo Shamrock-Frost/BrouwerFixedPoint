@@ -1,5 +1,6 @@
 import topology.constructions
 import topology.separation
+import topology.category.Top.basic
 
 lemma quotient_map_of_is_closed_map {α β} [topological_space α] [topological_space β] 
   (f : α → β) : function.surjective f → is_closed_map f → continuous f → quotient_map f :=
@@ -24,3 +25,19 @@ lemma surjection_of_compact_hausdorff_is_quot_map {α β} [topological_space α]
 λ hSurj hCont, quotient_map_of_is_closed_map f hSurj
                                              (λ C hC, (hC.is_compact.image hCont).is_closed)
                                              hCont
+
+noncomputable
+def lift_along_quot_map {α β γ : Top} (q : α ⟶ β) (f : α ⟶ γ) (Hquot : quotient_map q)
+  (H : ∀ x y, q x = q y → f x = f y) : β ⟶ γ := {
+    to_fun := λ b, f (classical.some (Hquot.left b)),
+    continuous_to_fun := (quotient_map.continuous_iff Hquot).mpr
+                          (continuous.congr f.continuous_to_fun
+                            (λ x, H x _ (eq.symm (classical.some_spec (Hquot.left (q x))))))
+  }
+
+lemma lift_along_quot_map_spec {α β γ : Top} (q : α ⟶ β) (f : α ⟶ γ) (Hquot : quotient_map q)
+  (H : ∀ x y, q x = q y → f x = f y) (b : β) (a : α) (h : q a = b)
+  : lift_along_quot_map q f Hquot H b = f a := 
+  H (classical.some (lift_along_quot_map._proof_1 q Hquot b)) a
+    ((classical.some_spec (Hquot.left b)).trans h.symm)
+

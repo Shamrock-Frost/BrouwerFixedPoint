@@ -8,10 +8,6 @@ local attribute [instance]
 def simplex_category.squash (n : ℕ) : simplex_category.mk n ⟶ simplex_category.mk 0 :=
   simplex_category.mk_hom ⟨(λ _, 0), by { intros x y _, reflexivity }⟩
 
--- def simplex_category.vertex (n : ℕ) (i : fin (n + 1))
---   : simplex_category.mk 0 ⟶ simplex_category.mk n :=
---   @simplex_category.mk_hom 0 n ⟨(λ _, i), (λ _ _ _, refl _)⟩
-
 noncomputable
 def topological_simplex (n : ℕ) := simplex_category.to_Top.obj (simplex_category.mk n)
 
@@ -24,7 +20,7 @@ def topological_simplex.point : topological_simplex 0 := ⟨(λ _, 1), by {
   assumption
 }⟩
 
-instance topologica_simplex.point_unique : unique (topological_simplex 0) := {
+instance topological_simplex.point_unique : unique (topological_simplex 0) := {
   default := topological_simplex.point,
   uniq := by {
     suffices : ∀ x : topological_simplex 0, x.val 0 = 1,
@@ -49,10 +45,15 @@ noncomputable
 def inclusion (n : ℕ) : topological_simplex n ⟶ topological_simplex (n + 1) := 
   simplex_category.to_Top.map (simplex_category.δ 0)
 
-noncomputable 
-def const (n : ℕ) : topological_simplex n ⟶ topological_simplex (n + 1) :=
+noncomputable
+def const_vertex (n : ℕ) (i : simplex_category.mk (n + 1))
+  : topological_simplex n ⟶ topological_simplex (n + 1) :=
   simplex_category.to_Top.map (simplex_category.squash n
-                                ≫ simplex_category.const (simplex_category.mk (n+1)) 0)
+                                ≫ simplex_category.const (simplex_category.mk (n+1)) i)
+
+-- noncomputable 
+-- def const (n : ℕ) : topological_simplex n ⟶ topological_simplex (n + 1) :=
+--   const_idx n 0
 
 noncomputable
 def vertex (n : ℕ) (i : simplex_category.mk n) : topological_simplex n 
@@ -121,14 +122,35 @@ begin
     exact topological_simplex.has_one_implies_eq_zero n i x hi _ h }
 end
 
-lemma const_desc (n : ℕ) (x : topological_simplex n) : const n x = vertex (n+1) 0 :=
+lemma const_desc (n : ℕ) (i : simplex_category.mk (n + 1)) (x : topological_simplex n)
+  : const_vertex n i x = vertex (n+1) i :=
 begin
-  delta const,
+  delta const_vertex,
   delta vertex,
   rw simplex_category.to_Top.map_comp,
   simp, congr,
-  apply @unique.eq_default _ topologica_simplex.point_unique
+  apply @unique.eq_default _ topological_simplex.point_unique
 end
+
+lemma deg_zero_zeroth_coface_map_is_vertex_one 
+  : simplex_category.to_Top_map (simplex_category.δ 0) topological_simplex.point
+  = vertex 1 1 :=
+by {
+  transitivity const_vertex 0 1 topological_simplex.point,
+  { congr, ext, cases x with x hx, cases x,
+    refl, exfalso, simp at hx, assumption },
+  { apply const_desc } 
+}
+
+lemma deg_zero_oneth_coface_map_is_vertex_zero
+  : simplex_category.to_Top_map (simplex_category.δ 1) topological_simplex.point
+  = vertex 1 0 :=
+by {
+  transitivity const_vertex 0 0 topological_simplex.point,
+  { congr, ext, cases x with x hx, cases x,
+    refl, exfalso, simp at hx, assumption },
+  { apply const_desc } 
+}
 
 lemma coface_map_misses_output (n : ℕ) (i : fin (n + 2)) (j : simplex_category.mk n) :
   simplex_category.δ i j ≠ i :=
@@ -139,6 +161,34 @@ lemma succ_sigma_of_nonzero (n : ℕ) (k : simplex_category.mk (n + 1)) (h : k �
 begin
   cases k with k hk,
   cases k, contradiction, refl
+end
+
+lemma fourth_simplicial_identity_modified (n : ℕ)
+  (j : fin (n + 2)) (i : simplex_category.mk (n + 1))
+  (H : ¬ (j = 0 ∧ i = 0))
+  : simplex_category.δ j (simplex_category.σ 0 i)
+  = simplex_category.σ 0 (simplex_category.δ j.succ i) :=
+begin
+  by_cases j = 0,
+  { subst h, rw not_and at H, specialize H rfl,
+    have : i = simplex_category.δ 0 (simplex_category.σ 0 i),
+    { symmetry, apply succ_sigma_of_nonzero, assumption },
+    rw this,
+    generalize : simplex_category.σ 0 i = i', clear H this i,
+    transitivity simplex_category.δ 0
+                    ((simplex_category.δ (fin.cast_succ 0) ≫ simplex_category.σ 0) i'),
+    refl,
+    rw simplex_category.δ_comp_σ_self, 
+    transitivity (simplex_category.δ (fin.succ 0) ≫ simplex_category.σ 0)
+                    (simplex_category.δ 0 i'),
+    rw simplex_category.δ_comp_σ_succ, refl, refl },
+  { transitivity (simplex_category.σ 0 ≫ simplex_category.δ j) i, refl,
+    rw ← simplex_category.δ_comp_σ_of_gt, 
+    { refl },
+    { apply lt_of_le_of_ne,
+      apply fin.zero_le,
+      apply ne.symm, dsimp,
+      assumption } }
 end
 
 lemma sum_over_n_simplices_eq {G} [add_comm_monoid  G] (n : ℕ) (f : simplex_category.mk n → G) :
