@@ -8,24 +8,24 @@ open category_theory category_theory.limits
 
 -- I do not understand universes
 
-section
-
 local attribute [instance] category_theory.limits.has_zero_object.has_zero
-local attribute [instance]
-  category_theory.concrete_category.has_coe_to_sort
-  category_theory.concrete_category.has_coe_to_fun
+
+lemma id_eq_zero_of_iso_zero (V : Type*) [category V] [has_zero_object V] [has_zero_morphisms V]
+  (X : V) (H : is_isomorphic X 0) : 𝟙 X = 0 :=
+begin
+  replace H := H, cases H,
+  transitivity H.hom ≫ H.inv, simp,
+  transitivity H.hom ≫ 0,
+  { congr, ext },
+  { apply_instance },
+  { simp }
+end
+
+section
 
 universes u v w
 
 parameters {C : Type u} [category C] {R : Type v} [comm_ring R]
-
-lemma category_theory.eq_app_inv_of_app_hom_eq [concrete_category C] {X Y : C} (f : X ≅ Y)
-  {x : X} {y : Y} (H : f.hom x = y) : x = f.inv y := 
-begin
-  transitivity f.inv (f.hom x),
-  { simp },
-  { rw H }
-end
 
 def homological_complex.mk_nat_trans {V : Type v} [category V] [abelian V]
   {ι : Type w} {c : complex_shape ι}
@@ -40,12 +40,43 @@ def homological_complex.mk_nat_trans {V : Type v} [category V] [abelian V]
     naturality' := λ X Y f, homological_complex.hom.ext _ _ (funext (λ i, (η i).naturality f))
   }
 
-instance zero_obj_subsingleton : subsingleton (0 : Module R) := 
-  let f := is_zero.iso_zero (Module.is_zero_of_subsingleton (Module.of R punit))
-  in ⟨λ a b, have h : f.hom (f.inv a) = f.hom (f.inv b),
-             from congr_arg f.hom (subsingleton.elim (f.inv a) (f.inv b)),
-             by { change (f.inv ≫ f.hom) a = (f.inv ≫ f.hom) b at h,
-                  rw iso.inv_hom_id at h, exact h }⟩ 
+def homological_complex.d_nat_trans {V : Type v} [category V] [abelian V]
+  {ι : Type w} {c : complex_shape ι}
+  (F : C ⥤ homological_complex V c)
+  (i j : ι) : (F ⋙ homological_complex.eval V c i) ⟶ (F ⋙ homological_complex.eval V c j) := {
+    app := λ X, (F.obj X).d i j,
+    naturality' := by simp
+  }
+
+local attribute [instance]
+  category_theory.concrete_category.has_coe_to_sort
+  category_theory.concrete_category.has_coe_to_fun
+
+lemma category_theory.eq_app_inv_of_app_hom_eq [concrete_category C] {X Y : C} (f : X ≅ Y)
+  {x : X} {y : Y} (H : f.hom x = y) : x = f.inv y := 
+begin
+  transitivity f.inv (f.hom x),
+  { simp },
+  { rw H }
+end
+
+lemma Module.to_homology.homomorphism {ι : Type w} {c : complex_shape ι}
+                                      (C : homological_complex (Module R) c) (i : ι)
+                                      : @is_linear_map R (linear_map.ker (C.d_from i)) 
+                                                         (C.homology i)
+                                                         _
+                                                         _
+                                                         _
+                                                         _
+                                                         _
+                                                         (@Module.to_homology R _ ι c C i) := by {
+    delta Module.to_homology, delta Module.to_cycles,
+    delta homology.π, delta Module.to_kernel_subobject,
+    constructor; intros; simp,
+  }
+
+lemma all_eq_zero_of_iso_zero {M : Module R} (H : is_isomorphic M 0) (x : M) : x = 0 :=
+  congr_fun (congr_arg coe_fn (id_eq_zero_of_iso_zero _ M H)) x
 
 def exists_preim_cycle_of_to_homology_zero {ι : Type w} {c : complex_shape ι}
                                            (C : homological_complex (Module R) c) (i j : ι)
@@ -133,19 +164,6 @@ lemma preim_cycle_of_to_homology_zero_spec {ι : Type w} {c : complex_shape ι}
 @classical.some_spec (C.X i) (λ y, C.d i j y = x)
                      (exists_preim_cycle_of_to_homology_zero C i j hij x is_cycle H)
 
-lemma all_eq_zero_of_iso_zero {M : Module R} (H : is_isomorphic M 0) (x : M) : x = 0 :=
-begin
-  replace H := H, cases H,
-  transitivity H.inv (H.hom x),
-  rw ← category_theory.comp_apply,
-  rw H.hom_inv_id, 
-  refl,
-  transitivity H.inv 0,
-  apply congr_arg,
-  { apply subsingleton.elim },
-  simp
-end
-
 noncomputable
 def preim_cycle_of_homology_zero {ι : Type w} {c : complex_shape ι}
                                  (C : homological_complex (Module R) c) (i j : ι)
@@ -192,7 +210,7 @@ begin
       rw iso.hom_inv_id at this,
       exact this },
     delta Module.to_homology, delta homology.π,
-    simp, --[Module.cokernel_π_cokernel_iso_range_quotient_hom],
+    simp,
     congr, ext, simp },
   { refl }
 end
@@ -211,6 +229,44 @@ def preim_of_homology_class_spec {ι : Type w} {c : complex_shape ι}
   classical.some_spec (exists_preim_homology_class C i y)
 
 end
+
+def chain_complex.mk_nat_trans_rec {C : Type*} [category C] {V : Type*} [category V] [abelian V]
+  {F G : C ⥤ chain_complex V ℕ}
+  (init : (F ⋙ homological_complex.eval V _ 0) ⟶ (G ⋙ homological_complex.eval V _ 0))
+  (step : Π (n : ℕ) (η : (F ⋙ homological_complex.eval V _ n)
+                       ⟶ (G ⋙ homological_complex.eval V _ n)),
+            (∀ X, (F.obj X).d (n + 1) n ≫ nat_trans.app η X ≫ (G.obj X).d_from n = 0)
+            → ((F ⋙ homological_complex.eval V _ (n + 1))
+              ⟶ (G ⋙ homological_complex.eval V _ (n + 1))))
+  (Hstep : ∀ (n : ℕ) (η : (F ⋙ homological_complex.eval V _ n)
+                       ⟶ (G ⋙ homological_complex.eval V _ n))
+             (h : ∀ X, (F.obj X).d (n + 1) n ≫ nat_trans.app η X ≫ (G.obj X).d_from n = 0),
+             ∀ X, nat_trans.app (step n η h) X ≫ (G.obj X).d (n + 1) n
+                = (F.obj X).d (n + 1) n ≫ nat_trans.app η X)
+  : F ⟶ G :=
+  homological_complex.mk_nat_trans
+    (λ k,
+      (@nat.rec (λ n, Σ' (η : (F ⋙ homological_complex.eval V _ n)
+                            ⟶ (G ⋙ homological_complex.eval V _ n)), 
+                        ∀ X, (F.obj X).d_to n ≫ nat_trans.app η X ≫ (G.obj X).d_from n = 0)
+                ⟨init, by simp⟩
+                (λ n p, have ∀ X, (F.obj X).d (n + 1) n ≫ p.fst.app X
+                                ≫ homological_complex.d_from (G.obj X) n = 0,
+                        by { intro X, have := p.2 X,
+                             rw homological_complex.d_to_eq _ (complex_shape.down_mk (n + 1) n rfl) at this,
+                             rw category.assoc at this,
+                             rw ← category_theory.iso.eq_inv_comp at this,
+                             simp at this, exact this },
+                        ⟨step n p.1 this,
+                         by { intro X,
+                              rw homological_complex.d_from_eq _ (complex_shape.down_mk (n + 1) n rfl),
+                              rw ← category.assoc ((step n p.fst this).app X),
+                              rw Hstep,
+                              rw [← category.assoc, ← category.assoc],
+                              rw homological_complex.d_to_eq _ (complex_shape.down_mk (n + 2) (n + 1) rfl),
+                              simp }⟩)
+                k).fst)
+    (by { intros i j h X, dsimp at h, subst h, apply Hstep })
 
 section
 
@@ -269,35 +325,8 @@ lemma map_out_desc {F : C ⥤ Module R} (b : functor_basis F) (G : C ⥤ Module 
        symmetry,
        apply basis.mk_apply }
 
--- Should probably generalize ℕ to ι
 def complex_functor_basis (F : C ⥤ chain_complex (Module R) ℕ) :=
   Π (n : ℕ), functor_basis (F ⋙ homological_complex.eval _ _ n)
-
-noncomputable
-def complex_functor_basis.mk_nat_trans
-  {F : C ⥤ chain_complex (Module R) ℕ}
-  (b : complex_functor_basis F)
-  (G : C ⥤ chain_complex (Module R) ℕ)
-  (η : Π (i : ℕ), (F ⋙ homological_complex.eval _ _ i) ⟶ (G ⋙ homological_complex.eval _ _ i))
-  (η_comm_ds : ∀ i X, (η (i + 1)).app X ≫ (G.obj X).d (i + 1) i
-                       = (F.obj X).d (i + 1) i ≫ (η i).app X)
-  : F ⟶ G := 
-  homological_complex.mk_nat_trans η (by { intros i j h, dsimp at h, rw ← h, exact η_comm_ds j })
-
--- lemma based_complex_functor.mk_nat_trans_apply 
---   {F : C ⥤ chain_complex (Module R) ℕ}
---   {G : C ⥤ chain_complex (Module R) ℕ}
---   (η : Π (i : ℕ), (F.in_degree i).F ⟶ (G ⋙ homological_complex.eval _ _ i))
---   (η_comm_ds : ∀ i X, (η (i + 1)).app X ≫ (G.obj X).d (i + 1) i
---                        = (F.differentials i).app X ≫ (η i).app X)
---   (X : C) (n : ℕ)
---   : ((based_complex_functor.mk_nat_trans η η_comm_ds).app X).f n = (η n).app X :=
--- begin
---   dsimp [based_complex_functor.mk_nat_trans, homological_complex.mk_nat_trans],
---   congr,
---   apply stupid,
---   apply cast_heq
--- end
 
 -- dieck says it should be H_{n+1}(G_*(B_{n+1, j})) = 0 but it's actually H_{n+1}(G_*(B_{n, j})) = 0
 def acyclic {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
@@ -318,149 +347,58 @@ def lift_nat_trans_deg0 {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_fu
                                                                           by simp⟩)))
 
 noncomputable
-def lift_nat_trans_deg1 {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
+def lift_nat_trans_step {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
                         (G : functor C (chain_complex (Module R) ℕ))
-                        (H_acyclic : acyclic b G)
-                        (ϕ : (F ⋙ homology_functor (Module R) _ 0)
-                           ⟶ (G ⋙ homology_functor (Module R) _ 0))
-  : (F ⋙ homological_complex.eval _ _ 1) ⟶ (G ⋙ homological_complex.eval _ _ 1) :=
-  have h : ∀ (i : (b 1).indices), 
-                   (G.obj ((b 1).models i)).d_from 0
-                     ((lift_nat_trans_deg0 b G H_acyclic ϕ).app ((b 1).models i)
-                         ((F.obj ((b 1).models i)).d 1 0 ((b 1).basis_elem i)))
-                         = 0,
-  by { intro i,
-       suffices : (lift_nat_trans_deg0 b G H_acyclic ϕ).app ((b 1).models i)
-                  ≫ (G.obj ((b 1).models i)).d_from 0 = 0,
-       exact congr_fun (congr_arg coe_fn this) ((F.obj ((b 1).models i)).d 1 0 ((b 1).basis_elem i)),
-       apply basis.ext ((b 0).get_basis ((b 1).models i)),
-       intro j,
-       simp },
-  (b 1).map_out (G ⋙ homological_complex.eval _ _ 1)
-                (λ i, preim_cycle_of_homology_zero _ _ _
-                                                  (rfl : (complex_shape.down ℕ).rel 1 0)
-                                                  (H_acyclic 0 i)
-                                                  _
-                                                  (h i))
-
-noncomputable
-def lift_nat_trans_degsucc {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F) (G : functor C (chain_complex (Module R) ℕ))
-  (H_acyclic : acyclic b G) (n : ℕ)
-  (α : (F ⋙ homological_complex.eval _ _ n)       ⟶ (G ⋙ homological_complex.eval _ _ n))
-  (β : (F ⋙ homological_complex.eval _ _ (n + 1)) ⟶ (G ⋙ homological_complex.eval _ _ (n + 1)))
-  (H : ∀ X, β.app X ≫ (G.obj X).d (n + 1) n = (F.obj X).d (n + 1) n ≫ α.app X)
-  : (F ⋙ homological_complex.eval _ _ (n + 2)) ⟶ (G ⋙ homological_complex.eval _ _ (n + 2)) := 
-  (b (n + 2)).map_out (G ⋙ homological_complex.eval _ _ (n + 2))
+                        (H_acyclic : acyclic b G) (n : ℕ)
+  (ψ : (F ⋙ homological_complex.eval _ _ n) ⟶ (G ⋙ homological_complex.eval _ _ n))
+  (H : ∀ i : (b (n + 1)).indices, ψ.app ((b (n + 1)).models i) ((F.obj ((b (n + 1)).models i)).d (n + 1) n ((b (n + 1)).basis_elem i))
+                                ∈ linear_map.ker ((G.obj ((b (n + 1)).models i)).d_from n))
+  : (F ⋙ homological_complex.eval _ _ (n + 1)) ⟶ (G ⋙ homological_complex.eval _ _ (n + 1)) := 
+  (b (n + 1)).map_out (G ⋙ homological_complex.eval _ _ (n + 1))
                       (λ i, 
-  let F'' := F ⋙ homological_complex.eval _ _ (n + 2),
-      m   := (b (n+2)).models i,
-      b_m := (b (n+2)).basis_elem i in
-  have h1 : (G.obj m).d_from (n + 1)
-                    (β.app m ((F.obj m).d (n + 2) (n + 1) ((b (n+2)).basis_elem i))) = 0,
-  by { have h : (complex_shape.down ℕ).rel (n + 1) n := rfl, 
-       rw homological_complex.d_from_eq _ h,
-       change (homological_complex.X_next_iso (G.obj m) h).inv 
-                 ((β.app m ≫ (G.obj m).d (n + 1) n)
-                     ((F.obj m).d (n+2) (n+1) b_m)) = 0,
-       rw H,
-       rw [category_theory.comp_apply, ← category_theory.comp_apply _ ((F.obj m).d (n +1 ) n)],
-       simp, 
-       rw (_ : α.app m 0 = 0),
-       simp,
-       simp },
+  let F'  := F ⋙ homological_complex.eval _ _ (n + 1),
+      m   := (b (n + 1)).models i,
+      b_m := (b (n + 1)).basis_elem i in
   preim_cycle_of_homology_zero _ _ _
-                               (rfl : (complex_shape.down ℕ).rel (n + 2) (n + 1))
-                               (H_acyclic (n + 1) i)
+                               (rfl : (complex_shape.down ℕ).rel (n + 1) n)
+                               (H_acyclic n i)
                                _
-                               h1)
+                               (H i))
 
--- Should refactor the following two into a single lemma
-
-lemma first_step_natural {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
-                         (G : C ⥤ chain_complex (Module R) ℕ)
-                         (H_acyclic : acyclic b G)
-                         (ϕ : (F ⋙ homology_functor (Module R) _ 0)
-                            ⟶ (G ⋙ homology_functor (Module R) _ 0)) (X : C)
-  : (lift_nat_trans_deg1 b G H_acyclic ϕ).app X ≫ (G.obj X).d 1 0
-  = (F.obj X).d 1 0 ≫ (lift_nat_trans_deg0 b G H_acyclic ϕ).app X :=
+lemma step_chain_map {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
+                     (G : C ⥤ chain_complex (Module R) ℕ)
+                     (H_acyclic : acyclic b G) (n : ℕ)
+  (ψ : (F ⋙ homological_complex.eval _ _ n) ⟶ (G ⋙ homological_complex.eval _ _ n))
+  (H : ∀ i : (b (n + 1)).indices, ψ.app ((b (n + 1)).models i) ((F.obj ((b (n + 1)).models i)).d (n + 1) n ((b (n + 1)).basis_elem i))
+                                ∈ linear_map.ker ((G.obj ((b (n + 1)).models i)).d_from n))
+  (X : C)
+  : (lift_nat_trans_step b G H_acyclic n ψ H).app X ≫ (G.obj X).d (n + 1) n
+  = (F.obj X).d (n + 1) n ≫ ψ.app X :=
 begin
-  apply basis.ext ((b 1).get_basis X),
-  intro p, cases p with i f, 
-  dsimp [functor_basis.get_basis, lift_nat_trans_deg1],
-  rw [basis.mk_apply],
-  rw (_ : (F.map f).f 1 ((b 1).basis_elem i)
-        = (F ⋙ homological_complex.eval (Module R) (complex_shape.down ℕ) 1).map f
-            ((b 1).basis_elem i)),
-  rw map_out_desc,
-  rw [category_theory.functor.comp_map, homological_complex.eval_map],
-  rw ← category_theory.comp_apply ((G.map f).f 1) ((G.obj X).d 1 0),
-  rw (G.map f).comm',
-  rw category_theory.comp_apply,
-  rw preim_cycle_of_homology_zero_spec,
-  rw ← category_theory.comp_apply _ ((G.map f).f 0),
-  have := (lift_nat_trans_deg0 b G H_acyclic ϕ).naturality' f,
-  dsimp at this, rw ← this,
-  dsimp,
-  congr,
-  rw [← category_theory.comp_apply, ← (F.map f).comm' 1 0 _],
-  refl,
-  { apply complex_shape.down'_mk, refl },
-  { apply complex_shape.down'_mk, refl },
-  { refl }
-end
-
-lemma step_natural {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
-  (G : C ⥤ chain_complex (Module R) ℕ)
-  (H_acyclic : acyclic b G) (n : ℕ)
-  (α : (F ⋙ homological_complex.eval _ _ n)       ⟶ (G ⋙ homological_complex.eval _ _ n))
-  (β : (F ⋙ homological_complex.eval _ _ (n + 1)) ⟶ (G ⋙ homological_complex.eval _ _ (n + 1)))
-  (H : ∀ X, β.app X ≫ (G.obj X).d (n + 1) n = (F.obj X).d (n + 1) n ≫ α.app X) (X : C)
-  : (lift_nat_trans_degsucc b G H_acyclic n α β H).app X ≫ (G.obj X).d (n + 2) (n + 1)
-  = (F.obj X).d (n + 2) (n + 1) ≫ β.app X :=
-begin
-  apply basis.ext ((b (n + 2)).get_basis X),
+  apply basis.ext ((b (n + 1)).get_basis X),
   intro p, cases p with i f,
-  dsimp [functor_basis.get_basis, lift_nat_trans_degsucc],
+  dsimp [functor_basis.get_basis, lift_nat_trans_step],
   rw [basis.mk_apply],
-  rw (_ : (F.map f).f (n + 2) ((b (n + 2)).basis_elem i)
-        = (F ⋙ homological_complex.eval (Module R) (complex_shape.down ℕ) (n + 2)).map f
-            ((b (n + 2)).basis_elem i)),
+  rw (_ : (F.map f).f (n + 1) ((b (n + 1)).basis_elem i)
+        = (F ⋙ homological_complex.eval (Module R) (complex_shape.down ℕ) (n + 1)).map f
+            ((b (n + 1)).basis_elem i)),
   rw map_out_desc,
   rw [category_theory.functor.comp_map, homological_complex.eval_map],
-  rw ← category_theory.comp_apply ((G.map f).f (n + 2)) ((G.obj X).d (n + 2) (n + 1)),
+  rw ← category_theory.comp_apply ((G.map f).f (n + 1)) ((G.obj X).d (n + 1) n),
   rw (G.map f).comm',
   rw category_theory.comp_apply,
   rw preim_cycle_of_homology_zero_spec,
-  rw ← category_theory.comp_apply _ ((G.map f).f (n + 1)),
-  have := β.naturality' f,
+  rw ← category_theory.comp_apply _ ((G.map f).f n),
+  have := ψ.naturality' f,
   dsimp at this, rw ← this,
   dsimp,
   congr,
-  rw [← category_theory.comp_apply, ← (F.map f).comm' (n + 2) (n + 1) _],
+  rw [← category_theory.comp_apply, ← (F.map f).comm' (n + 1) n _],
   refl,
   { apply complex_shape.down'_mk, refl },
   { apply complex_shape.down'_mk, refl },
   { refl }
 end
-
-noncomputable
-def lift_nat_trans_nth_map {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
-                           (G : C ⥤ chain_complex (Module R) ℕ)
-                           (H_acyclic : acyclic b G)
-                           (ϕ : (F ⋙ homology_functor (Module R) _ 0)
-                              ⟶ (G ⋙ homology_functor (Module R) _ 0))
-  : Π (n : ℕ),
-    Σ' (α : (F ⋙ homological_complex.eval _ _ n)       ⟶ (G ⋙ homological_complex.eval _ _ n))
-       (β : (F ⋙ homological_complex.eval _ _ (n + 1)) ⟶ (G ⋙ homological_complex.eval _ _ (n + 1))),
-    ∀ X : C, nat_trans.app β X ≫ (G.obj X).d (n + 1) n = (F.obj X).d (n + 1) n ≫ nat_trans.app α X
-| 0       := ⟨lift_nat_trans_deg0 b G H_acyclic ϕ,
-              lift_nat_trans_deg1 b G H_acyclic ϕ,
-              first_step_natural  b G H_acyclic ϕ⟩
-| (n + 1) := match lift_nat_trans_nth_map n with
-             | ⟨prev, curr, h⟩ := ⟨curr,
-                                  lift_nat_trans_degsucc b G H_acyclic n prev curr h,
-                                  step_natural b G H_acyclic n prev curr h⟩
-             end
 
 noncomputable
 def lift_nat_trans {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
@@ -469,12 +407,16 @@ def lift_nat_trans {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor
                    (ϕ : (F ⋙ homology_functor (Module R) _ 0)
                       ⟶ (G ⋙ homology_functor (Module R) _ 0))
   : F ⟶ G :=
-  b.mk_nat_trans G (λ i, (lift_nat_trans_nth_map b G H_acyclic ϕ i).fst)
-                   (λ i, by { dsimp [lift_nat_trans_nth_map],
-                              generalize : lift_nat_trans_nth_map b G H_acyclic ϕ i = c,
-                              cases c, cases c_snd with _ comm,
-                              delta lift_nat_trans_nth_map._match_1,
-                              apply comm })
+  have ∀ (n : ℕ) (η : F ⋙ homological_complex.eval _ _ n ⟶ G ⋙ homological_complex.eval _ _ n)
+         (h : ∀ (X : C), (F.obj X).d (n + 1) n ≫ nat_trans.app η X
+                         ≫ homological_complex.d_from (G.obj X) n = 0)
+         (i : (b (n + 1)).indices),
+         nat_trans.app η ((b (n + 1)).models i) ((F.obj ((b (n + 1)).models i)).d (n + 1) n ((b (n + 1)).basis_elem i))
+         ∈ linear_map.ker (homological_complex.d_from (G.obj ((b (n + 1)).models i)) n)
+  := λ n η h i, congr_fun (congr_arg coe_fn (h ((b (n + 1)).models i))) ((b (n + 1)).basis_elem i),
+  chain_complex.mk_nat_trans_rec (lift_nat_trans_deg0 b G H_acyclic ϕ)
+                                 (λ n η h, lift_nat_trans_step b G H_acyclic n η (this n η h))
+                                 (λ n η h, step_chain_map b G H_acyclic n η (this n η h))
 
 lemma lift_nat_trans_app0 {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
   (G : C ⥤ chain_complex (Module R) ℕ)
@@ -486,7 +428,6 @@ lemma lift_nat_trans_app0 {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_
   = (G ⋙ homology_functor (Module R) _ 0).map f
       (ϕ.app ((b 0).models i) (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩)) := 
 begin
-  delta lift_nat_trans,
   transitivity Module.to_homology ⟨(lift_nat_trans_deg0 b G H_acyclic ϕ).app X ((F ⋙ homological_complex.eval _ _ 0).map f ((b 0).basis_elem i)), by simp⟩, refl,
   dsimp [lift_nat_trans_deg0],
   rw (_ : (F.map f).f 0 ((b 0).basis_elem i)
@@ -583,16 +524,74 @@ begin
     refl }
 end
 
--- def chain_htpy_of_lifts_deg0 {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F) (G : functor C (chain_complex (Module R) ℕ))
---   (H_acyclic : acyclic F G) (ϕ : (F.to_complex_functor ⋙ homology_functor (Module R) _ 0)
---                                ⟶ (G ⋙ homology_functor (Module R) _ 0)) 
---   (α β : F.to_complex_functor ⟶ G)
---   (Hα : whisker_right α (homology_functor (Module R) _ 0) = ϕ)
---   (Hβ : whisker_right β (homology_functor (Module R) _ 0) = ϕ)
---   : (F.in_degree 0).F ⟶ (G ⋙ homological_complex.eval _ _ 1) :=
---   based_free_functor.map_out (F.in_degree 0) (G ⋙ homological_complex.eval _ _ 1)
---                              (λ i, by {  })
+noncomputable
+def chain_htpy_of_lifts_deg0 {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
+                             (G : C ⥤ chain_complex (Module R) ℕ)
+                             (H_acyclic : acyclic b G)
+                             (ϕ : (F ⋙ homology_functor (Module R) _ 0)
+                                ⟶ (G ⋙ homology_functor (Module R) _ 0)) 
+  (α β : F ⟶ G)
+  (Hα : whisker_right α (homology_functor (Module R) _ 0) = ϕ)
+  (Hβ : whisker_right β (homology_functor (Module R) _ 0) = ϕ)
+  : (F ⋙ homological_complex.eval _ _ 0) ⟶ (G ⋙ homological_complex.eval _ _ 1) :=
+  (b 0).map_out (G ⋙ homological_complex.eval _ _ 1)
+                (λ i, preim_cycle_of_to_homology_zero (G.obj ((b 0).models i)) 1 0 rfl
+                                                      (((β - α).app ((b 0).models i)).f 0 ((b 0).basis_elem i))
+                                                      (by simp)
+                                                      (by { 
+    have h1 : (β.app ((b 0).models i)).f 0 ((b 0).basis_elem i)
+            ∈ linear_map.ker (homological_complex.d_from (G.obj ((b 0).models i)) 0),
+    { simp },
+    have h2 : (α.app ((b 0).models i)).f 0 ((b 0).basis_elem i)
+            ∈ linear_map.ker (homological_complex.d_from (G.obj ((b 0).models i)) 0),
+    { simp },
+    generalize c1_def : (⟨(β.app ((b 0).models i)).f 0 ((b 0).basis_elem i), h1⟩
+                        : linear_map.ker (homological_complex.d_from (G.obj ((b 0).models i)) 0))
+                      = c1,
+    generalize c2_def : (⟨(α.app ((b 0).models i)).f 0 ((b 0).basis_elem i), h2⟩
+                        : linear_map.ker (homological_complex.d_from (G.obj ((b 0).models i)) 0))
+                      = c2,
+    transitivity @has_sub.sub (@homological_complex.homology ℕ (Module R) _ _ (complex_shape.down ℕ) _ _ _ _
+                                (G.obj ((b 0).models i)) 0) 
+                        (by apply_instance)
+                        (Module.to_homology c1)
+                        (Module.to_homology c2),
+    { transitivity Module.to_homology (c1 - c2),
+      congr, rw [← c1_def, ← c2_def], simp,  
+      exact is_linear_map.map_sub (Module.to_homology.homomorphism (G.obj ((b 0).models i)) _) c1 c2 },
+    { rw sub_eq_zero,
+      have : ∀ γ : F ⟶ G,
+              (whisker_right γ (homology_functor (Module R) (complex_shape.down ℕ) 0) = ϕ)
+              → ∀ (h : (γ.app ((b 0).models i)).f 0 ((b 0).basis_elem i)
+                     ∈ linear_map.ker (homological_complex.d_from (G.obj ((b 0).models i)) 0)),
+                  Module.to_homology ⟨(γ.app ((b 0).models i)).f 0 ((b 0).basis_elem i), h⟩
+                  = (ϕ.app ((b 0).models i)) (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩),
+      { intros γ Hγ h,
+        rw ← Hγ,
+        simp,
+        delta Module.to_homology,
+        congr,
+        symmetry, apply Module.cycles_map_to_cycles },
+      rw [← c1_def, ← c2_def, this β Hβ h1, this α Hα h2] } }))
 
+noncomputable
+def chain_htpy_of_lifts_deg1 {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
+                             (G : C ⥤ chain_complex (Module R) ℕ)
+                             (H_acyclic : acyclic b G)
+                             (ϕ : (F ⋙ homology_functor (Module R) _ 0)
+                                ⟶ (G ⋙ homology_functor (Module R) _ 0)) 
+  (α β : F ⟶ G)
+  (Hα : whisker_right α (homology_functor (Module R) _ 0) = ϕ)
+  (Hβ : whisker_right β (homology_functor (Module R) _ 0) = ϕ)
+  : (F ⋙ homological_complex.eval _ _ 1) ⟶ (G ⋙ homological_complex.eval _ _ 2) :=
+  (b 1).map_out (G ⋙ homological_complex.eval _ _ 2)
+                (λ i, preim_cycle_of_to_homology_zero (G.obj ((b 1).models i)) 2 1 rfl
+                                                      ((whisker_right β (homological_complex.eval (Module R) _ 1)
+                                                       - whisker_right α (homological_complex.eval (Module R) _ 1)
+                                                       - (homological_complex.d_nat_trans F 1 0 ≫ chain_htpy_of_lifts_deg0 b G H_acyclic ϕ α β Hα Hβ)).app
+                                                       ((b 1).models i) ((b 1).basis_elem i))
+                                                      (by { simp })
+                                                      (by { admit }))
 -- lemma lift_nat_trans_unique {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F) (G : functor C (chain_complex (Module R) ℕ))
 --   (H_acyclic : acyclic F G) (ϕ : (F.to_complex_functor ⋙ homology_functor (Module R) _ 0)
 --                                ⟶ (G ⋙ homology_functor (Module R) _ 0)) 
@@ -600,6 +599,5 @@ end
 --   (Hα : whisker_right α (homology_functor (Module R) _ 0) = ϕ)
 --   (Hβ : whisker_right β (homology_functor (Module R) _ 0) = ϕ)
 --   :
-
 
 end
