@@ -12,11 +12,13 @@ import topology.constructions
 import topology.category.CompHaus.default
 import topology.homotopy.contractible
 import data.opposite
-import .simplices .instances .general_topology .finsupp
+import .simplices .instances .general_topology .homological_algebra .linear_algebra
 
 open category_theory algebraic_topology
 
 notation `I` := Top.of unit_interval
+
+section
 
 local attribute [instance]
   category_theory.concrete_category.has_coe_to_sort
@@ -310,18 +312,20 @@ begin
       apply fin.succ_ne_zero } }
 end
 
+end
+
 section
 
 noncomputable
-def free_complex_on_sset (R) [comm_ring R] : sSet ⥤ chain_complex (Module R) ℕ :=
+def free_complex_on_sset (R : Type*) [comm_ring R] : sSet ⥤ chain_complex (Module R) ℕ :=
   ((simplicial_object.whiskering _ _).obj (Module.free R)) ⋙ alternating_face_map_complex _
 
 noncomputable
-def singular_chain_complex (R) [comm_ring R] : Top ⥤ chain_complex (Module R) ℕ :=
+def singular_chain_complex (R : Type*) [comm_ring R] : Top ⥤ chain_complex (Module R) ℕ :=
   Top.to_sSet ⋙ free_complex_on_sset R
 
 noncomputable
-def singular_homology (R) [comm_ring R] (n : ℕ) : Top ⥤ Module R :=
+def singular_homology (R : Type*) [comm_ring R] (n : ℕ) : Top ⥤ Module R :=
   singular_chain_complex R ⋙ homology_functor _ _ n
 
 noncomputable
@@ -332,17 +336,17 @@ def singular_zero_simplex_of_pt {X : Top} (x0 : X)
 noncomputable
 def simplex_to_chain {n : ℕ} {X : sSet}
   (σ : X.obj (opposite.op (simplex_category.mk n)))
-  (R) [comm_ring R] : ((free_complex_on_sset R).obj X).X n :=
+  (R : Type*) [comm_ring R] : ((free_complex_on_sset R).obj X).X n :=
   finsupp.single σ 1
 
 noncomputable
-def ε_map (R) [comm_ring R] {X : Top} (x0 : X) : Π (n : ℕ),
+def ε_map (R : Type*) [comm_ring R] {X : Top} (x0 : X) : Π (n : ℕ),
   ((singular_chain_complex R).obj X).X n → ((singular_chain_complex R).obj X).X n
 | 0 := λ x, finsupp.sum x (λ _ n, n • simplex_to_chain (singular_zero_simplex_of_pt x0) R)
 | _ := 0
 
 noncomputable
-def ε_hom (R) [comm_ring R] {X : Top} (x0 : X) (n : ℕ) : 
+def ε_hom (R : Type*) [comm_ring R] {X : Top} (x0 : X) (n : ℕ) : 
   ((singular_chain_complex R).obj X).X n ⟶ ((singular_chain_complex R).obj X).X n := {
     to_fun := ε_map R x0 n,
     map_add' := by { intros, cases n; dsimp [ε_map],
@@ -360,7 +364,7 @@ def ε_hom (R) [comm_ring R] {X : Top} (x0 : X) (n : ℕ) :
 
 open_locale big_operators
 
-lemma singular_chain_complex_differential_desc (R) [comm_ring R] {X : Top} {n : ℕ}
+lemma singular_chain_complex_differential_desc (R : Type*) [comm_ring R] {X : Top} {n : ℕ}
   (σ : topological_simplex (n + 1) ⟶ X)
   : ((singular_chain_complex R).obj X).d (n + 1) n (finsupp.single σ 1)
   = ∑ (i : fin (n + 2)), (-1 : ℤ)^(i : ℕ)
@@ -388,7 +392,7 @@ lemma singular_chain_complex_differential_desc (R) [comm_ring R] {X : Top} {n : 
         exact finsupp.single_eq_same } }
   }
 
-lemma singular_chain_complex_differential_desc_deg_0 (R) [comm_ring R] {X : Top}
+lemma singular_chain_complex_differential_desc_deg_0 (R : Type*) [comm_ring R] {X : Top}
   (σ : topological_simplex 1 ⟶ X)
   : ((singular_chain_complex R).obj X).d 1 0 (finsupp.single σ 1)
   = simplex_to_chain (simplex_category.to_Top.map (@simplex_category.δ 0 0) ≫ σ) R 
@@ -405,7 +409,7 @@ begin
 end
 
 noncomputable
-def ε (R) [comm_ring R] {X : Top} (x0 : X) 
+def ε (R : Type*) [comm_ring R] {X : Top} (x0 : X) 
   : (singular_chain_complex R).obj X ⟶ (singular_chain_complex R).obj X := {
   f := ε_hom R x0,
   comm' := by {
@@ -423,29 +427,28 @@ def cone_construction_lift_simplex {X : Top} (x0 : X)
   (H : continuous_map.homotopy (continuous_map.id X) (continuous_map.const X x0)) (i : ℕ)
   (σ : topological_simplex i ⟶ X) : topological_simplex (i + 1) ⟶ X :=
   let σ' : (Top.of (I × topological_simplex i)) ⟶ (Top.of (I × X)) :=
-      ⟨(λ x, (x.1, σ.to_fun x.2)), by { continuity, exact continuous_fst,
-                                        exact σ.continuous,
-                                        exact continuous_snd }⟩,
-        Hσ' : Top.of (I × topological_simplex i) ⟶ X := σ' ≫ H.to_continuous_map
+        category_theory.functor.map cylinder.{0} σ,
+      Hσ' : Top.of (I × topological_simplex i) ⟶ X := σ' ≫ H.to_continuous_map
     in @lift_along_quot_map (Top.of (I × topological_simplex i)) (topological_simplex (i + 1)) X
                             ⟨function.uncurry (q_map i), q_continuous i⟩
                             Hσ' (q_quot i)
                             (by { intros x y Hxy,
                                   cases q_fiber_desc Hxy,
-                                  { dsimp [Hσ'], rw [h.left, h.right],
+                                  { dsimp [Hσ', σ', cylinder],
+                                    rw [h.left, h.right],
                                     transitivity, apply H.map_one_left',
                                     symmetry, transitivity, apply H.map_one_left',
                                     refl },
                                   { rw h } })
 
 noncomputable
-def cone_construction_hom (R) [comm_ring R] {X : Top} (x0 : X)
+def cone_construction_hom (R : Type*) [comm_ring R] {X : Top} (x0 : X)
   (H : continuous_map.homotopy (continuous_map.id X) (continuous_map.const X x0)) (i : ℕ)
   : ((singular_chain_complex R).obj X).X i ⟶ ((singular_chain_complex R).obj X).X (i + 1) :=
   (Module.free R).map (cone_construction_lift_simplex x0 H i)
 
 noncomputable
-def cone_construction_complex_hom (R) [comm_ring R] {X : Top} (x0 : X)
+def cone_construction_complex_hom (R : Type*) [comm_ring R] {X : Top} (x0 : X)
   (H : continuous_map.homotopy (continuous_map.id X) (continuous_map.const X x0))
   (i j : ℕ) : ((singular_chain_complex R).obj X).X i ⟶ ((singular_chain_complex R).obj X).X j :=
   if h : i + 1 = j
@@ -520,7 +523,7 @@ begin
   { transitivity, exact H.map_zero_left' _, refl }
 end
 
-lemma cone_construction_comm_zero (R) [comm_ring R] {X : Top} (x0 : X)
+lemma cone_construction_comm_zero (R : Type*) [comm_ring R] {X : Top} (x0 : X)
   (H : continuous_map.homotopy (continuous_map.id X) (continuous_map.const X x0))
   (σ : topological_simplex 0 ⟶ X)
   : finsupp.single σ 1
@@ -542,7 +545,7 @@ begin
     rw unique.forall_iff,
     dsimp [default],
     rw deg_zero_zeroth_coface_map_is_vertex_one,
-    rw (_ : vertex 1 1 = inclusion 0 topological_simplex.point),
+    rw (_ : vertex _ _ = inclusion 0 topological_simplex.point),
     { rw cone_construction_complex_hom_desc_base },
     { symmetry, exact deg_zero_zeroth_coface_map_is_vertex_one } },
   { congr,
@@ -554,7 +557,7 @@ begin
     refl }
 end
 
-lemma cone_construction_comm_higher_deg (R) [comm_ring R] {X : Top} (x0 : X)
+lemma cone_construction_comm_higher_deg (R : Type*) [comm_ring R] {X : Top} (x0 : X)
   (H : continuous_map.homotopy (continuous_map.id X) (continuous_map.const X x0))
   (i : ℕ) (σ : topological_simplex (i + 1) ⟶ X)
   : finsupp.single σ 1
@@ -591,7 +594,7 @@ begin
 end
 
 noncomputable
-def cone_construction (R) [comm_ring R] {X : Top} (x0 : X)
+def cone_construction (R : Type*) [comm_ring R] {X : Top} (x0 : X)
   (H : continuous_map.homotopy (continuous_map.id X) (continuous_map.const X x0))
   : homotopy (homological_complex.id _) (ε R x0) := {
     hom := cone_construction_complex_hom R x0 H,
@@ -610,16 +613,23 @@ def cone_construction (R) [comm_ring R] {X : Top} (x0 : X)
 
 end
 
+section
+
+local attribute [instance] category_theory.limits.has_zero_object.has_zero
+
+local attribute [instance]
+  category_theory.concrete_category.has_coe_to_sort
+  category_theory.concrete_category.has_coe_to_fun
+
 open category_theory.limits
 
-lemma is_zero_of_id_eq_zero (R) [comm_ring R] (M : Module R) : 𝟙 M = 0 → is_zero M :=
-begin
-  intro h,
-  refine @Module.is_zero_of_subsingleton _ _ M (subsingleton_of_forall_eq (0 : M) _),
-  intro y,
-  transitivity ((𝟙 M : M ⟶ M) y),
-  refl, rw h, refl
-end
+lemma iso_zero_of_id_eq_zero (R : Type*) [comm_ring R] (M : Module R)
+  (h : 𝟙 M = 0) : is_isomorphic M 0 :=
+    ⟨is_zero.iso_zero (@Module.is_zero_of_subsingleton _ _ M
+                         ⟨λ x y, calc x = (𝟙 M : M ⟶ M) x : rfl
+                                    ... = (0 : M ⟶ M) x   : congr_fun (congr_arg _ h) x
+                                    ... = (0 : M ⟶ M) y   : rfl
+                                    ... = (𝟙 M : M ⟶ M) y : (congr_fun (congr_arg _ h) y).symm⟩)⟩
 
 lemma homology_at_ith_index_zero {ι : Type*} (V : Type*) [category V] [has_zero_morphisms V]
                                  (c : complex_shape ι) [has_zero_object V] [has_equalizers V]
@@ -636,11 +646,11 @@ begin
   rw H, simp
 end
 
-lemma homology_of_contractible_space (R) (X : Top) [comm_ring R] [contractible_space X]
-  : ∀ (i : ℕ), 0 < i → is_zero ((singular_homology R i).obj X) := 
+lemma homology_of_contractible_space (R : Type*) (X : Top) [comm_ring R] [contractible_space X]
+  : ∀ (i : ℕ), 0 < i → is_isomorphic ((singular_homology R i).obj X) 0 := 
 begin
   intros i h,
-  apply is_zero_of_id_eq_zero,
+  apply iso_zero_of_id_eq_zero,
   transitivity (homology_functor _ _ i).map
     (homological_complex.id ((singular_chain_complex R).obj X)),
   symmetry, apply category_theory.functor.map_id,
@@ -654,6 +664,53 @@ begin
   refl  
 end
 
--- lemma singular_homology.homotopy_invariant (n : ℕ) (X Y : Top) (f g : X ⟶ Y) 
---   (H : continuous_map.homotopy f g) : (singular_homology n).map f = (singular_homology n).map g :=
--- sorry
+noncomputable
+def singular_chain_complex_basis (R : Type*) [comm_ring R]
+  : complex_functor_basis (singular_chain_complex R) := 
+  λ n, { indices := unit,
+         models := λ _, topological_simplex n,
+         basis_elem := λ _, simplex_to_chain (𝟙 (topological_simplex n)) R,
+         lin_indep := λ X, let g : (topological_simplex n ⟶ X)
+                                 → ((singular_chain_complex R).obj X).X n
+                                 := λ f, ((singular_chain_complex R).map f).f n
+                                           (simplex_to_chain (𝟙 (topological_simplex n)) R),
+                               e : (Σ (i : unit), topological_simplex n ⟶ X)
+                                 ≃ (topological_simplex n ⟶ X) :=
+                                 equiv.trans (equiv.sigma_equiv_prod unit _)
+                                              (equiv.punit_prod _) in
+                           have H : linear_independent R g,
+                           by { have : g = (λ f, simplex_to_chain f R),
+                                { apply funext, intro f,
+                                  transitivity, apply finsupp.map_domain_single,
+                                  apply congr_fun, apply congr_arg,
+                                  ext, refl },
+                                rw this,
+                                dsimp [simplex_to_chain],
+                                apply free_module_basis_linear_independent },
+                           (linear_independent_equiv' e.symm rfl).mp H,
+         spanning := λ X, by { transitivity submodule.span R (set.range (λ f,
+                                    (finsupp.single f (1 : R)
+                                    : (Module.free R).obj (topological_simplex n ⟶ X)))),
+                               { congr, ext, split,
+                                 { rintro ⟨i, f, h⟩,
+                                   existsi f,
+                                   rw ← h, symmetry,
+                                   transitivity, apply finsupp.map_domain_single, 
+                                   congr, ext, refl },
+                                 { rintro ⟨f, h⟩,
+                                   existsi unit.star, existsi f,
+                                   rw ← h, 
+                                   transitivity, apply finsupp.map_domain_single, 
+                                   congr, ext, refl } },
+                                 apply free_module_basis_spanning } }
+
+lemma singular_homology.homotopy_invariant (R : Type*) [comm_ring R]
+  (n : ℕ) (X Y : Top) (f g : X ⟶ Y) (H : continuous_map.homotopy f g)
+  : (singular_homology R n).map f = (singular_homology R n).map g :=
+  lifts_of_nat_trans_H0_give_same_map_in_homology
+    (singular_chain_complex_basis R)
+    (cylinder ⋙ singular_chain_complex R)
+    -- (λ n i, ⟨homology_of_contractible_space R (Top.of (I × topological_simplex (n + 1))) n, 
+    --          homology_of_contractible_space⟩)
+
+end

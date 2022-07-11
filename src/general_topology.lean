@@ -1,6 +1,7 @@
 import topology.constructions
 import topology.separation
 import topology.category.Top.basic
+import topology.unit_interval
 
 lemma quotient_map_of_is_closed_map {α β} [topological_space α] [topological_space β] 
   (f : α → β) : function.surjective f → is_closed_map f → continuous f → quotient_map f :=
@@ -41,3 +42,13 @@ lemma lift_along_quot_map_spec {α β γ : Top} (q : α ⟶ β) (f : α ⟶ γ) 
   H (classical.some (lift_along_quot_map._proof_1 q Hquot b)) a
     ((classical.some_spec (Hquot.left b)).trans h.symm)
 
+universe u
+noncomputable
+def cylinder : Top.{u} ⥤ Top.{u} := {
+  obj := λ X, Top.of (unit_interval × X),
+  map := λ X Y f, continuous_map.mk (λ p : unit_interval × X, (p.fst, f p.snd))
+                                    (continuous.prod_mk continuous_fst
+                                      (continuous.comp f.continuous continuous_snd)),
+  map_id' := by { intros, ext p, cases p, simp, refl },
+  map_comp' := by { intros, ext p, cases p, simp, refl },
+}
