@@ -10,8 +10,9 @@ import algebraic_topology.simplex_category
 import algebraic_topology.topological_simplex
 import topology.constructions
 import topology.category.CompHaus.default
-import topology.homotopy.contractible
-import data.opposite
+import topology.homotopy.product topology.homotopy.contractible
+import analysis.convex.contractible
+import data.opposite data.finset.pointwise
 import .simplices .instances .general_topology .homological_algebra .linear_algebra
 
 open category_theory algebraic_topology
@@ -615,6 +616,8 @@ end
 
 section
 
+universe u
+
 local attribute [instance] category_theory.limits.has_zero_object.has_zero
 
 local attribute [instance]
@@ -646,7 +649,7 @@ begin
   rw H, simp
 end
 
-lemma homology_of_contractible_space (R : Type*) (X : Top) [comm_ring R] [contractible_space X]
+lemma homology_of_contractible_space (R : Type*) [comm_ring R] (X : Top) (h : contractible_space X)
   : ∀ (i : ℕ), 0 < i → is_isomorphic ((singular_homology R i).obj X) 0 := 
 begin
   intros i h,
@@ -661,7 +664,7 @@ begin
   apply homology_at_ith_index_zero,
   ext, simp,
   dsimp [ε, ε_hom, ε_map],
-  refl  
+  refl 
 end
 
 noncomputable
@@ -704,13 +707,144 @@ def singular_chain_complex_basis (R : Type*) [comm_ring R]
                                    congr, ext, refl } },
                                  apply free_module_basis_spanning } }
 
+lemma prod_of_contractible_contractible (X Y : Type*) [topological_space X] [topological_space Y]
+  (hX : contractible_space X) (hY : contractible_space Y) : contractible_space (X × Y) := 
+begin
+  rw contractible_iff_id_nullhomotopic at *,
+  rcases hX with ⟨x0, ⟨H_X⟩⟩, rcases hY with ⟨y0, ⟨H_Y⟩⟩,
+  existsi (x0, y0),
+  have : continuous_map.homotopic _ _ :=
+    ⟨continuous_map.homotopy.prod ((continuous_map.homotopy.refl ⟨@prod.fst X Y⟩).hcomp H_X)
+                                  ((continuous_map.homotopy.refl ⟨@prod.snd X Y⟩).hcomp H_Y)⟩,
+  refine eq.mp _ this,
+  congr; ext; cases a; refl
+end
+
+-- Should probably use this in more places?
+noncomputable
+def topological_simplex_alt (n : ℕ) :=
+  Top.of { f : fin (n + 1) → ℝ | (∀ i, 0 ≤ f i) ∧ (finset.univ.sum f = 1) }
+
+def topological_simplex_alt_desc (n : ℕ) : topological_simplex n ≃ₜ topological_simplex_alt n := {
+  to_fun := λ x, ⟨λ i, (x.val i).val, λ i, (x.val i).property,
+                    by { have := (congr_arg subtype.val x.property),
+                        refine eq.trans _ this,
+                        symmetry, 
+                        simp at this,
+                        have := map_sum (⟨subtype.val, _, _⟩ : nnreal →+ ℝ) x.val finset.univ,
+                        swap, { refl }, swap, { rintros ⟨x, _⟩ ⟨y, _⟩, simp },
+                        refine eq.trans this _,
+                        congr }⟩,
+  inv_fun := λ x, ⟨λ i, ⟨x.val i, x.property.left i⟩,
+                     by { refine subtype.eq _,
+                         have := x.property.right,
+                         refine eq.trans _ this,
+                         let f : fin (n + 1) → nnreal := λ i, ⟨x.val i, x.property.left i⟩,
+                         have := map_sum (⟨subtype.val, _, _⟩ : nnreal →+ ℝ) f finset.univ,
+                         swap, { refl }, swap, { rintros ⟨x, _⟩ ⟨y, _⟩, simp },
+                         refine eq.trans this _,
+                         congr }⟩,
+  left_inv := λ x, by simp,
+  right_inv := λ x, by simp,
+  continuous_to_fun := by { simp, continuity,
+                            apply continuous.congr ((continuous_apply i).comp continuous_subtype_coe), 
+                            simp },
+  continuous_inv_fun := by { simp, continuity,
+                             apply continuous.congr ((continuous_apply i).comp continuous_subtype_coe), 
+                             simp }
+}
+
+def inclusion_at_t_nat_trans (t : unit_interval) : category_theory.functor.id Top ⟶ cylinder := {
+  app := λ X, ⟨λ x, (t, x), by continuity⟩
+}
+
+lemma inclusion_at_t_nat_trans_on_chain (R : Type*) [comm_ring R]
+  (t : unit_interval) (n : ℕ)
+  : ((singular_chain_complex R).map
+     ((inclusion_at_t_nat_trans t).app 
+       ((singular_chain_complex_basis R n).models unit.star))).f n
+          ((singular_chain_complex_basis R n).basis_elem unit.star)
+  = simplex_to_chain ⟨prod.mk t, by continuity⟩ R :=
+begin
+  delta singular_chain_complex, delta free_complex_on_sset,
+  simp,
+  delta singular_chain_complex_basis,
+  simp [simplex_to_chain],
+  refl
+end
+
 lemma singular_homology.homotopy_invariant (R : Type*) [comm_ring R]
   (n : ℕ) (X Y : Top) (f g : X ⟶ Y) (H : continuous_map.homotopy f g)
   : (singular_homology R n).map f = (singular_homology R n).map g :=
-  lifts_of_nat_trans_H0_give_same_map_in_homology
-    (singular_chain_complex_basis R)
-    (cylinder ⋙ singular_chain_complex R)
-    -- (λ n i, ⟨homology_of_contractible_space R (Top.of (I × topological_simplex (n + 1))) n, 
-    --          homology_of_contractible_space⟩)
+  by {
+    have :=
+    lifts_of_nat_trans_H0_give_same_map_in_homology
+      (singular_chain_complex_basis R)
+      (cylinder ⋙ singular_chain_complex R)
+      (λ n k hn hk i, 
+        have H : contractible_space (unit_interval × topological_simplex k),
+        by { apply prod_of_contractible_contractible,
+               { apply convex.contractible_space,
+                 apply @convex_Icc ℝ ℝ _ _ _ _ 0 1,
+                 existsi (0 : ℝ), simp },
+               { rw homeomorph.contractible_space_iff (topological_simplex_alt_desc k),
+                 apply convex.contractible_space,
+                 { intros x y hx hy s t hs ht hsum,
+                   split,
+                   { intro i, rw [pi.add_apply, pi.smul_apply, pi.smul_apply],
+                     have hxi := hx.left i, have hyi := hy.left i,
+                     apply @convex_Ici ℝ ℝ _ _ _ _ 0; assumption },
+                   { rw ← hsum,
+                     transitivity (s • (finset.univ.sum x)) + (t • (finset.univ.sum y)),
+                     rw [finset.smul_sum, finset.smul_sum, ← finset.sum_add_distrib],
+                     congr, 
+                     rw [hx.right, hy.right],
+                     simp } },
+                 { existsi (topological_simplex_alt_desc k (vertex k 1)).val,
+                   exact (topological_simplex_alt_desc k (vertex k 1)).property } } },
+        homology_of_contractible_space R (Top.of (unit_interval × topological_simplex k)) H n hn)
+    (whisker_right (inclusion_at_t_nat_trans 0) (singular_chain_complex R))
+    (whisker_right (inclusion_at_t_nat_trans 1) (singular_chain_complex R)) _ n X,
+    rw (_ : f = (inclusion_at_t_nat_trans 0).app _ ≫ H.to_continuous_map),
+    swap, { ext, symmetry, apply H.map_zero_left' },
+    transitivity (singular_homology R n).map ((inclusion_at_t_nat_trans 1).app _ ≫ H.to_continuous_map),
+    swap, { congr, ext, apply H.map_one_left' },
+    have := congr_arg (λ f, f ≫ @category_theory.functor.map _ _ _ _ (singular_homology R n) (Top.of (unit_interval × X)) (Top.of Y) (H.to_continuous_map)) this,
+    refine eq.trans _ (eq.trans this _);
+    rw (singular_homology R n).map_comp'; refl,
+    apply functor_basis.homology_map_ext (singular_chain_complex_basis R 0),
+    intro i, cases i,
+    refine exists.intro (simplex_to_chain _ R) _,
+    { refine ⟨(λ p, (⟨(p.val 0).val, (p.val 0).property, topological_simplex.coord_le_one 1 0 p⟩,
+                      topological_simplex.point)), _⟩,
+      continuity,
+      apply continuous.congr
+              (continuous.comp (continuous_apply 0 : continuous (λ x : fin 2 → nnreal, x 0))
+                               continuous_subtype_val),
+      intro x, cases x, simp },
+    dsimp [simplex_to_chain],
+    rw singular_chain_complex_differential_desc_deg_0,
+    rw [inclusion_at_t_nat_trans_on_chain, inclusion_at_t_nat_trans_on_chain],
+    delta simplex_category.to_Top,
+    simp,
+    rw add_sub_left_comm,
+    refine eq.trans (add_zero _).symm _,
+    congr,
+    { ext, simp [simplex_category.to_Top_map],
+      transitivity ↑((∅ : finset (fin 1)).sum (λ i, x.val i)),
+      simp,
+      apply_instance,
+      refl,
+      simp,
+      congr,
+      apply @unique.eq_default _ topological_simplex.point_unique },
+    { symmetry, rw sub_eq_zero, congr,
+      ext : 3, simp [simplex_category.to_Top_map],
+      have : finset.univ.sum x.val = (1 : nnreal) := x.property,
+      rw subtype.ext_iff at this,
+      refine eq.trans this.symm _,
+      congr,
+      simp, 
+      apply @unique.eq_default _ topological_simplex.point_unique } }
 
 end

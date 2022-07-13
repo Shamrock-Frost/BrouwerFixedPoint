@@ -21,11 +21,57 @@ begin
   { simp }
 end
 
+-- TODO: Put this in a better place and rename it
+lemma submodule_restrict_app {R : Type*}
+  {M₁ : Type*} {M₂ : Type*} {M₃ : Type*}
+  [semiring R] [add_comm_monoid M₁] [add_comm_monoid M₂] [add_comm_monoid M₃]
+  [module R M₁] [module R M₂] [module R M₃]
+  (p : submodule R M₂) (q : submodule R M₃)
+  (f : M₁ →ₗ[R] M₂) (g : M₂ →ₗ[R] M₃)
+  (hf : ∀ (x : M₁), f x ∈ p)
+  (hg : ∀ (y : p), g.dom_restrict p y ∈ q)
+  (x : M₁)
+  : linear_map.cod_restrict q (linear_map.dom_restrict g p) 
+      hg
+      (linear_map.cod_restrict p f hf x)
+  = linear_map.cod_restrict q (g.comp f) (λ x, hg ⟨f x, hf x⟩) x :=
+begin
+  ext, refl
+end
+
+local attribute [instance]
+  category_theory.concrete_category.has_coe_to_sort
+  category_theory.concrete_category.has_coe_to_fun
+
+lemma category_theory.eq_app_inv_of_app_hom_eq
+  {C : Type*} [category C] [concrete_category C] {X Y : C} (f : X ≅ Y)
+  {x : X} {y : Y} (H : f.hom x = y) : x = f.inv y := 
+begin
+  transitivity f.inv (f.hom x),
+  { simp },
+  { rw H }
+end
+
 section
 
 universes u uhom v vhom w
 
 parameters {C : Type u} [category.{uhom} C] {R : Type v} [comm_ring R]
+
+-- I think this is reproven several times in this file and should refactor to show that
+lemma homology_functor_map_on_to_homology
+  {ι : Type w} {c : complex_shape ι}
+  {X Y : homological_complex (Module R) c}
+  (f : X ⟶ Y)
+  (i : ι)
+  (x : linear_map.ker (homological_complex.d_from X i))
+  : (homology_functor (Module R) c i).map f (Module.to_homology x)
+  = Module.to_homology ⟨f.f i x.val, by { simp }⟩ :=
+begin
+  delta Module.to_homology,
+  simp,
+  exact congr_arg _ (Module.cycles_map_to_cycles f x)
+end
 
 def homological_complex.mk_nat_trans {V : Type v} [category.{vhom} V] [abelian V]
   {ι : Type w} {c : complex_shape ι}
@@ -58,32 +104,120 @@ structure natural_chain_homotopy {V : Type v} [category.{vhom} V] [abelian V]
 (naturality : ∀ X Y (f : X ⟶ Y) i j, c.rel i j → (F.map f).f j ≫ (to_chain_htpy Y).hom j i
                                                 = (to_chain_htpy X).hom j i ≫ (G.map f).f i)
 
-local attribute [instance]
-  category_theory.concrete_category.has_coe_to_sort
-  category_theory.concrete_category.has_coe_to_fun
-
-lemma category_theory.eq_app_inv_of_app_hom_eq [concrete_category C] {X Y : C} (f : X ≅ Y)
-  {x : X} {y : Y} (H : f.hom x = y) : x = f.inv y := 
-begin
-  transitivity f.inv (f.hom x),
-  { simp },
-  { rw H }
-end
-
 lemma Module.to_homology.homomorphism {ι : Type w} {c : complex_shape ι}
                                       (C : homological_complex (Module.{vhom} R) c) (i : ι)
-                                      : @is_linear_map R (linear_map.ker (C.d_from i)) 
-                                                         (C.homology i)
-                                                         _
-                                                         _
-                                                         _
-                                                         _
-                                                         _
-                                                         (@Module.to_homology R _ ι c C i) := by {
+                                      : is_linear_map R (@Module.to_homology R _ ι c C i) := by {
     delta Module.to_homology, delta Module.to_cycles,
     delta homology.π, delta Module.to_kernel_subobject,
     constructor; intros; simp,
   }
+
+lemma Module.to_cyles.homomorphism {ι : Type w} {c : complex_shape ι}
+                                   (C : homological_complex (Module.{vhom} R) c) (i : ι)
+                                   : is_linear_map R (@Module.to_cycles R _ ι c C i) := by {
+    delta Module.to_cycles, delta Module.to_kernel_subobject,
+    constructor; intros; simp
+  }
+
+lemma Module.to_homology_comp_homology_functor_map
+  {ι : Type w} {c : complex_shape ι}
+  {X Y : homological_complex (Module R) c}
+  (f : X ⟶ Y) (i : ι)
+  : Module.of_hom (is_linear_map.mk' Module.to_homology (Module.to_homology.homomorphism X i))
+  ≫ (homology_functor (Module R) c i).map f
+  = Module.of_hom 
+      (linear_map.cod_restrict (linear_map.ker (Y.d_from i)) 
+        (linear_map.dom_restrict (f.f i) (linear_map.ker (X.d_from i)))
+        (by intros; simp))
+  ≫ Module.of_hom (is_linear_map.mk' Module.to_homology (Module.to_homology.homomorphism Y i)) :=
+begin
+  ext, cases x, simp, delta Module.to_homology, congr,
+  transitivity, apply Module.cycles_map_to_cycles, refl
+end
+
+-- The version in mathlib fixed vhom to be v for some reason
+lemma Module.cokernel_π_ext' {M N : Module.{vhom} R} (f : M ⟶ N) {x y : N} (m : M) (w : x = y + f m) :
+  cokernel.π f x = cokernel.π f y :=
+by { subst w, simp, }
+
+def Module.range_to_ker {A B C : Module.{vhom} R} (f : A ⟶ B) (g : B ⟶ C)
+  (w : f ≫ g = 0) : Module.of R (linear_map.range f) ⟶ Module.of R (linear_map.ker g) := {
+    to_fun := λ x, ⟨x.val, by { obtain ⟨x,y,h⟩ := x, subst h, simp,
+                                rw [← category_theory.comp_apply, w], refl }⟩,
+    map_add' := by { rintros ⟨x, x', hx⟩ ⟨y, y', hy⟩, simp },
+    map_smul' := by { rintros r ⟨x, x', hx⟩, apply subtype.eq, simp },
+  }
+
+lemma Module.image_to_kernel'_kernel_iso_ker {A B C : Module.{vhom} R}
+  (f : A ⟶ B) (g : B ⟶ C) (w : f ≫ g = 0)
+  : (Module.image_iso_range f).inv ≫ image_to_kernel' f g w
+  =  Module.range_to_ker f g w ≫ (Module.kernel_iso_ker g).inv :=
+begin
+  rw [category_theory.iso.inv_comp_eq, ← category_theory.category.assoc,
+      category_theory.iso.eq_comp_inv],
+  suffices :
+    image_to_kernel' f g w ≫ (Module.kernel_iso_ker g).hom ≫ (linear_map.ker g).subtype
+    = (Module.image_iso_range f).hom ≫ Module.range_to_ker f g w ≫ (linear_map.ker g).subtype,
+  { apply linear_map.ext, intro x, apply subtype.eq,
+    exact congr_fun (congr_arg coe_fn this) x },
+  simp [image_to_kernel'], 
+  ext, simp [Module.range_to_ker],
+  transitivity (factor_thru_image f ≫ ((Module.image_iso_range f).hom
+                                      ≫ Module.of_hom (linear_map.range f).subtype)) x,
+  { congr, simp, symmetry, apply category_theory.limits.image.fac f },
+  { refl }
+end
+
+lemma Module.to_homology_ext
+  {ι : Type w} {c : complex_shape ι}
+  {X : homological_complex (Module.{vhom} R) c}
+  {i j : ι}
+  {x y : linear_map.ker (X.d_from j)}
+  (m : X.X i) (hm : x.val = y.val + X.d i j m) 
+  : Module.to_homology x = Module.to_homology y :=
+  Module.cokernel_π_ext'
+    (image_to_kernel (X.d_to j) (X.d_from j) (X.d_to_comp_d_from j))
+    ((image_subobject_iso (X.d_to j)).inv
+      ((Module.image_iso_range (X.d_to j)).inv
+        ⟨X.d i j m, 
+          by { by_cases c.rel i j,
+               { rw X.d_to_eq h,
+                 existsi (X.X_prev_iso h).inv m,
+                 simp },
+               { rw X.shape' i j h, apply submodule.zero_mem } }⟩))
+    (by { by_cases c.rel i j,
+          { have h1 : X.d i j m ∈ linear_map.ker (X.d_from j),
+            { simp,
+              rw ← X.X_prev_iso_comp_d_to h,
+              rw category_theory.comp_apply,
+              rw ← category_theory.comp_apply,
+              simp },
+            transitivity Module.to_cycles y
+                         + Module.to_cycles ⟨X.d i j m, h1⟩,
+            rw ← is_linear_map.map_add (Module.to_cyles.homomorphism X j),
+            congr, apply subtype.eq, exact hm,
+            congr,
+            delta Module.to_cycles,
+            simp,
+            rw ← category_theory.comp_apply (iso.inv _),
+            rw ← image_to_kernel'_kernel_subobject_iso,
+            rw [category_theory.comp_apply, ← category_theory.comp_apply (iso.inv _)],
+            rw Module.image_to_kernel'_kernel_iso_ker,
+            simp,
+            apply category_theory.eq_app_inv_of_app_hom_eq (kernel_subobject_iso (X.d_from j)),
+            apply category_theory.eq_app_inv_of_app_hom_eq,
+            apply subtype.eq, simp [Module.range_to_ker],
+            simp [Module.to_kernel_subobject, Module.kernel_iso_ker] },
+          { rw X.shape' i j h at hm, 
+            have : x = y := subtype.eq (eq.trans hm (add_zero _)),
+            transitivity Module.to_cycles x + 0,
+            rw this, simp, congr, assumption,
+            symmetry,
+            have : ∀ h' : X.d i j m ∈ linear_map.range (X.d_to j), 
+                    (⟨X.d i j m, h'⟩ : {t // t ∈ linear_map.range (X.d_to j)}) = 0,
+            { intro, simp, rw X.shape' i j h, refl },
+            rw this,
+            simp } })
 
 lemma all_eq_zero_of_iso_zero {M : Module.{vhom} R} (H : is_isomorphic M 0) (x : M) : x = 0 :=
   congr_fun (congr_arg coe_fn (id_eq_zero_of_iso_zero _ M H)) x
@@ -240,44 +374,6 @@ def preim_of_homology_class_spec {ι : Type w} {c : complex_shape ι}
 
 end
 
-def chain_complex.mk_nat_trans_rec {C : Type*} [category C] {V : Type*} [category V] [abelian V]
-  {F G : C ⥤ chain_complex V ℕ}
-  (init : (F ⋙ homological_complex.eval V _ 0) ⟶ (G ⋙ homological_complex.eval V _ 0))
-  (step : Π (n : ℕ) (η : (F ⋙ homological_complex.eval V _ n)
-                       ⟶ (G ⋙ homological_complex.eval V _ n)),
-            (∀ X, (F.obj X).d (n + 1) n ≫ nat_trans.app η X ≫ (G.obj X).d_from n = 0)
-            → ((F ⋙ homological_complex.eval V _ (n + 1))
-              ⟶ (G ⋙ homological_complex.eval V _ (n + 1))))
-  (Hstep : ∀ (n : ℕ) (η : (F ⋙ homological_complex.eval V _ n)
-                       ⟶ (G ⋙ homological_complex.eval V _ n))
-             (h : ∀ X, (F.obj X).d (n + 1) n ≫ nat_trans.app η X ≫ (G.obj X).d_from n = 0),
-             ∀ X, nat_trans.app (step n η h) X ≫ (G.obj X).d (n + 1) n
-                = (F.obj X).d (n + 1) n ≫ nat_trans.app η X)
-  : F ⟶ G :=
-  homological_complex.mk_nat_trans
-    (λ k,
-      (@nat.rec (λ n, Σ' (η : (F ⋙ homological_complex.eval V _ n)
-                            ⟶ (G ⋙ homological_complex.eval V _ n)), 
-                        ∀ X, (F.obj X).d_to n ≫ nat_trans.app η X ≫ (G.obj X).d_from n = 0)
-                ⟨init, by simp⟩
-                (λ n p, have ∀ X, (F.obj X).d (n + 1) n ≫ p.fst.app X
-                                ≫ homological_complex.d_from (G.obj X) n = 0,
-                        by { intro X, have := p.2 X,
-                             rw homological_complex.d_to_eq _ (complex_shape.down_mk (n + 1) n rfl) at this,
-                             rw category.assoc at this,
-                             rw ← category_theory.iso.eq_inv_comp at this,
-                             simp at this, exact this },
-                        ⟨step n p.1 this,
-                         by { intro X,
-                              rw homological_complex.d_from_eq _ (complex_shape.down_mk (n + 1) n rfl),
-                              rw ← category.assoc ((step n p.fst this).app X),
-                              rw Hstep,
-                              rw [← category.assoc, ← category.assoc],
-                              rw homological_complex.d_to_eq _ (complex_shape.down_mk (n + 2) (n + 1) rfl),
-                              simp }⟩)
-                k).fst)
-    (by { intros i j h X, dsimp at h, subst h, apply Hstep })
-
 def chain_complex.mk_natural_chain_homotopy {C : Type*} [category C]
   {V : Type*} [category V] [abelian V]
   {F G : C ⥤ chain_complex V ℕ}
@@ -400,17 +496,79 @@ basis.constr_basis (b.get_basis X) R (λ p, G.map p.2 (choices p.1)) ⟨i, f⟩
 def complex_functor_basis (F : C ⥤ chain_complex (Module.{vmod'} R) ℕ) :=
   Π (n : ℕ), functor_basis (F ⋙ homological_complex.eval _ _ n)
 
+lemma functor_basis.homology_map_ext 
+  {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ}
+  (b : functor_basis (F ⋙ homological_complex.eval _ _ 0))
+  (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
+  (α β : F ⟶ G)
+  (H : ∀ i : b.indices, ∃ y : (G.obj (b.models i)).X 1,
+        (α.app (b.models i)).f 0 (b.basis_elem i)
+        = (β.app (b.models i)).f 0 (b.basis_elem i)
+        + (G.obj (b.models i)).d 1 0 y)
+  : whisker_right α (homology_functor _ _ 0) = whisker_right β (homology_functor _ _ 0) :=
+begin
+  ext X : 2,
+  apply homology.ext,
+  have h1 : is_iso (category_theory.limits.kernel.ι ((F.obj X).d_from 0)),
+  { rw (F.obj X).d_from_eq_zero,
+    apply category_theory.limits.kernel.ι_zero_is_iso,
+    simp },
+  let i1 := @category_theory.as_iso _ _ _ _ _ h1,
+  let i2 : Module.of R (linear_map.ker ((F.obj X).d_from 0)) ≅ (F.obj X).X 0 := {
+    hom := (linear_map.ker ((F.obj X).d_from 0)).subtype,
+    inv := linear_map.cod_restrict (linear_map.ker ((F.obj X).d_from 0)) linear_map.id
+                                   (by intros; simp),
+    hom_inv_id' := by { ext, refl },
+    inv_hom_id' := by { ext, refl }
+  },
+  let : ↑(kernel_subobject ((F.obj X).d_from 0)) ≅ (F.obj X).X 0 :=
+    category_theory.limits.kernel_subobject_iso ((F.obj X).d_from 0) ≪≫ i1,
+  apply (category_theory.iso.cancel_iso_inv_left this _ _).mp,
+  apply basis.ext (b.get_basis X),
+  intro p, cases p with i f,
+  delta functor_basis.get_basis, rw basis.mk_apply,
+  rw [category_theory.functor.comp_map, homological_complex.eval_map],
+  rw [← category_theory.category.assoc, ← category_theory.category.assoc],
+  rw (_ : this.inv ≫ homology.π ((F.obj X).d_to 0) ((F.obj X).d_from 0) _
+        = i2.inv ≫ Module.of_hom (is_linear_map.mk' _ (Module.to_homology.homomorphism (F.obj X) 0))),
+  swap,
+  { ext : 1, simp, delta Module.to_homology, simp,
+    congr,
+    symmetry, 
+    apply category_theory.eq_app_inv_of_app_hom_eq i1,
+    simp },
+  cases H i with y hy,
+  rw [category_theory.category.assoc, category_theory.category.assoc,
+      category_theory.whisker_right_app, category_theory.whisker_right_app],
+  transitivity, exact congr_fun (congr_arg coe_fn (congr_arg2 category_theory.category_struct.comp rfl (Module.to_homology_comp_homology_functor_map (α.app X) 0))) ((F.map f).f 0 (b.basis_elem i)),
+  symmetry, transitivity, 
+  exact congr_fun (congr_arg coe_fn (congr_arg2 category_theory.category_struct.comp rfl (Module.to_homology_comp_homology_functor_map (β.app X) 0))) ((F.map f).f 0 (b.basis_elem i)),
+  simp,
+  symmetry,
+  rw [submodule_restrict_app, submodule_restrict_app],
+  simp,
+  refine Module.to_homology_ext ((G.map f).f 1 y) _,
+  rw ← category_theory.comp_apply ((G.map f).f 1),
+  rw (G.map f).comm',
+  simp only [function.comp_app, Module.coe_comp, linear_map.cod_restrict_apply, subtype.val_eq_coe],
+  rw [← category_theory.comp_apply, ← category_theory.comp_apply,
+      ← homological_complex.comp_f, ← homological_complex.comp_f],
+  simp,
+  rw ← map_add ((G.map f).f 0),
+  exact congr_arg _ hy,
+  dsimp, refl
+end
+
 -- dieck says it should be H_{n+1}(G_*(B_{n+1, j})) = 0 but it's actually
 -- H_{n+1}(G_*(B_{n, j})) = 0 and H_n(G_*(B_{n, j})) = 0
 def acyclic {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
-            (G : C ⥤ (chain_complex (Module.{vmod'} R) ℕ)) := 
-  ∀ n (i : (b (n + 1)).indices), is_isomorphic ((G.obj ((b (n+1)).models i)).homology n) 0
-                               ∧ is_isomorphic ((G.obj ((b (n+1)).models i)).homology (n + 1)) 0
+            (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ) := 
+  ∀ n k, n > 0 → (k = n ∨ k = n + 1)
+       → ∀ (i : (b k).indices), is_isomorphic ((G.obj ((b k).models i)).homology n) 0
 
 noncomputable
 def lift_nat_trans_deg0 {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
-                        (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
-  (H_acyclic : acyclic b G)
+  (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
   (ϕ : (F ⋙ homology_functor (Module R) _ 0) ⟶ (G ⋙ homology_functor (Module R) _ 0))
   : (F ⋙ homological_complex.eval _ _ 0) ⟶ (G ⋙ homological_complex.eval _ _ 0) :=
   (b 0).map_out (G ⋙ homological_complex.eval _ _ 0)
@@ -420,33 +578,112 @@ def lift_nat_trans_deg0 {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : co
                                                      (Module.to_homology ⟨(b 0).basis_elem i,
                                                                           by simp⟩)))
 
+lemma lift_nat_trans_deg0_is_lift {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
+  (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
+  (ϕ : (F ⋙ homology_functor (Module R) _ 0) ⟶ (G ⋙ homology_functor (Module R) _ 0))
+  (X : C)
+  : ∀ x (h' : x ∈ linear_map.ker ((F.obj X).d_from 0))
+        (h  : (lift_nat_trans_deg0 b G ϕ).app X x ∈ linear_map.ker ((G.obj X).d_from 0)),
+    Module.to_homology ⟨(lift_nat_trans_deg0 b G ϕ).app X x, h⟩
+    = ϕ.app X (Module.to_homology ⟨x, h'⟩) :=
+  let lhs_hom : (F.obj X).X 0 ⟶ (G.obj X).homology 0 :=
+    (lift_nat_trans_deg0 b G ϕ).app X
+    ≫ (@category_theory.as_iso _ _ _ _ _
+                               ((category_theory.subobject.is_iso_iff_mk_eq_top 
+                                  (kernel_subobject (homological_complex.d_from (G.obj X) 0)).arrow).mpr 
+                                    (by simp))).inv
+    ≫ homology.π _ _ _,
+      rhs_hom : (F.obj X).X 0 ⟶ (G.obj X).homology 0 :=
+    (@category_theory.as_iso _ _ _ _ _
+                             ((category_theory.subobject.is_iso_iff_mk_eq_top 
+                               (kernel_subobject (homological_complex.d_from (F.obj X) 0)).arrow).mpr 
+                                 (by simp))).inv
+    ≫ homology.π _ _ _
+    ≫ ϕ.app X
+  in suffices lhs_hom = rhs_hom,
+     by { intros,
+          have := congr_fun (congr_arg coe_fn this) x,
+          refine eq.trans _ (eq.trans this _),
+          { dsimp [lhs_hom],
+            -- This shows up in several places in the file, should def be a lemma
+            delta Module.to_homology,
+            congr,
+            delta Module.to_cycles, delta Module.to_kernel_subobject,
+            simp,
+            apply category_theory.eq_app_inv_of_app_hom_eq (@category_theory.as_iso _ _ _ _ _ _),
+            simp },
+          { dsimp [rhs_hom],
+            delta Module.to_homology,
+            congr,
+            delta Module.to_cycles, delta Module.to_kernel_subobject,
+            simp,
+            symmetry,
+            apply category_theory.eq_app_inv_of_app_hom_eq (@category_theory.as_iso _ _ _ _ _ _),
+            simp } },
+     by { apply basis.ext ((b 0).get_basis X),
+          intro p, cases p with i f,
+          simp [lift_nat_trans_deg0],
+          rw map_out_desc,
+          dsimp,
+          cases preim_of_homology_class_spec (G.obj ((b 0).models i)) 0
+                                                (ϕ.app ((b 0).models i)
+                                                  (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩)),
+          transitivity (G ⋙ homology_functor (Module R) _ 0).map f
+                        (Module.to_homology
+                          ⟨preim_of_homology_class
+                            (G.obj ((b 0).models i))
+                            0
+                            (ϕ.app ((b 0).models i)
+                                   (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩)),
+                           w⟩),
+          { dsimp, delta Module.to_homology,
+            rw homology.π_map_apply,
+            congr,
+            delta Module.to_cycles, delta Module.to_kernel_subobject,
+            simp,
+            symmetry,
+            apply category_theory.eq_app_inv_of_app_hom_eq (@category_theory.as_iso _ _ _ _ _ _),
+            simp },
+          { rw h,
+            rw [← category_theory.comp_apply, ← ϕ.naturality],
+            delta Module.to_homology, 
+            dsimp,
+            rw homology.π_map_apply,
+            congr,
+            apply category_theory.eq_app_inv_of_app_hom_eq (@category_theory.as_iso _ _ _ _ _ _),
+            simp,
+            symmetry,
+            apply basis.mk_apply } }
+
 noncomputable
 def lift_nat_trans_step {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
-                        (G : functor C (chain_complex (Module.{vmod'} R) ℕ))
-                        (H_acyclic : acyclic b G) (n : ℕ)
+  (G : functor C (chain_complex (Module.{vmod'} R) ℕ))
+  (n : ℕ)
   (ψ : (F ⋙ homological_complex.eval _ _ n) ⟶ (G ⋙ homological_complex.eval _ _ n))
   (H : ∀ i : (b (n + 1)).indices, ψ.app ((b (n + 1)).models i) ((F.obj ((b (n + 1)).models i)).d (n + 1) n ((b (n + 1)).basis_elem i))
                                 ∈ linear_map.ker ((G.obj ((b (n + 1)).models i)).d_from n))
+  (zero_in_homology : ∀ i, Module.to_homology ⟨_, H i⟩ = (0 : (G.obj ((b (n + 1)).models i)).homology n))
   : (F ⋙ homological_complex.eval _ _ (n + 1)) ⟶ (G ⋙ homological_complex.eval _ _ (n + 1)) := 
   (b (n + 1)).map_out (G ⋙ homological_complex.eval _ _ (n + 1))
                       (λ i, 
   let F'  := F ⋙ homological_complex.eval _ _ (n + 1),
       m   := (b (n + 1)).models i,
       b_m := (b (n + 1)).basis_elem i in
-  preim_cycle_of_homology_zero _ _ _
-                               (rfl : (complex_shape.down ℕ).rel (n + 1) n)
-                               (H_acyclic n i).left
-                               _
-                               (H i))
+  preim_cycle_of_to_homology_zero _ _ _
+                                  (rfl : (complex_shape.down ℕ).rel (n + 1) n)
+                                  _
+                                  (H i)
+                                  (zero_in_homology i))
 
 lemma step_chain_map {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
-                     (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
-                     (H_acyclic : acyclic b G) (n : ℕ)
+  (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
+  (n : ℕ)
   (ψ : (F ⋙ homological_complex.eval _ _ n) ⟶ (G ⋙ homological_complex.eval _ _ n))
   (H : ∀ i : (b (n + 1)).indices, ψ.app ((b (n + 1)).models i) ((F.obj ((b (n + 1)).models i)).d (n + 1) n ((b (n + 1)).basis_elem i))
                                 ∈ linear_map.ker ((G.obj ((b (n + 1)).models i)).d_from n))
+  (zero_in_homology : ∀ i, Module.to_homology ⟨_, H i⟩ = (0 : (G.obj ((b (n + 1)).models i)).homology n))
   (X : C)
-  : (lift_nat_trans_step b G H_acyclic n ψ H).app X ≫ (G.obj X).d (n + 1) n
+  : (lift_nat_trans_step b G n ψ H zero_in_homology).app X ≫ (G.obj X).d (n + 1) n
   = (F.obj X).d (n + 1) n ≫ ψ.app X :=
 begin
   apply basis.ext ((b (n + 1)).get_basis X),
@@ -457,7 +694,7 @@ begin
   rw ← category_theory.comp_apply ((G.map f).f (n + 1)) ((G.obj X).d (n + 1) n),
   rw (G.map f).comm' _ _ (complex_shape.down_mk (n + 1) n rfl),
   rw category_theory.comp_apply,
-  rw preim_cycle_of_homology_zero_spec,
+  rw preim_cycle_of_to_homology_zero_spec,
   rw ← category_theory.comp_apply _ ((G.map f).f n),
   have := ψ.naturality' f,
   dsimp at this, rw ← this,
@@ -468,58 +705,127 @@ begin
   rw basis.mk_apply
 end
 
+lemma first_step_zero_in_homology {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
+  (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
+  (ϕ : (F ⋙ homology_functor (Module R) _ 0) ⟶ (G ⋙ homology_functor (Module R) _ 0))
+  (i : (b (0 + 1)).indices)
+  (h : (lift_nat_trans_deg0 b G ϕ).app ((b (0 + 1)).models i) 
+        ((F.obj ((b (0 + 1)).models i)).d (0 + 1) 0 ((b (0 + 1)).basis_elem i))
+        ∈ linear_map.ker ((G.obj ((b (0 + 1)).models i)).d_from 0))
+  : Module.to_homology
+      ⟨(lift_nat_trans_deg0 b G ϕ).app ((b (0 + 1)).models i) 
+        ((F.obj ((b (0 + 1)).models i)).d (0 + 1) 0 ((b (0 + 1)).basis_elem i)), h⟩
+    = (0 : ((G.obj ((b (0 + 1)).models i)).homology 0)) :=
+begin
+  transitivity, apply lift_nat_trans_deg0_is_lift, simp,
+  transitivity ϕ.app ((b (0 + 1)).models i) 0,
+  congr,
+  delta Module.to_homology,
+  delta homology.π,
+  rw ← Module.range_mkq_cokernel_iso_range_quotient_inv,
+  dsimp,
+  refine eq.trans (congr_arg _ _) (map_zero _),
+  refine (submodule.quotient.mk_eq_zero _).mpr _,
+  simp,
+  let y : image_subobject (homological_complex.d_to (F.obj ((b (0 + 1)).models i)) 0),
+  { refine (image_subobject_iso _ ≪≫ Module.image_iso_range _).inv _,
+    refine subtype.mk (((F.obj ((b (0 + 1)).models i)).d (0 + 1) 0)
+                          ((b (0 + 1)).basis_elem i))
+                      _,
+    have h : 0 + 1 = 1 := rfl,
+    rw homological_complex.d_to_eq _ (complex_shape.down_mk 1 0 h),
+    existsi (homological_complex.X_prev_iso (F.obj ((b (0 + 1)).models i)) _).inv ((b (0 + 1)).basis_elem i),
+    rw ← category_theory.comp_apply,
+    rw ← category_theory.category.assoc,
+    rw iso.inv_hom_id,
+    simp },
+  existsi y,
+  delta Module.to_cycles,
+  delta Module.to_kernel_subobject,
+  dsimp,
+  apply category_theory.eq_app_inv_of_app_hom_eq,
+  apply category_theory.eq_app_inv_of_app_hom_eq,
+  apply submodule.injective_subtype,
+  transitivity (F.obj ((b (0 + 1)).models i)).d (0 + 1) 0 ((b (0 + 1)).basis_elem i),
+  rw Module.kernel_iso_ker_hom_ker_subtype_apply,
+  simp [y],
+  rw ← category_theory.comp_apply,
+  rw category_theory.limits.image_subobject_arrow',
+  simp,
+  refl,
+  simp
+end
+        
+
 noncomputable
-def lift_nat_trans {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
-                   (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
+def lift_nat_trans_deg1 {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
+  (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
+  (ϕ : (F ⋙ homology_functor (Module R) _ 0) ⟶ (G ⋙ homology_functor (Module R) _ 0))
+  : (F ⋙ homological_complex.eval _ _ 1) ⟶ (G ⋙ homological_complex.eval _ _ 1) :=
+  lift_nat_trans_step b G 0 (lift_nat_trans_deg0 b G ϕ)
+                      (by { intro, simp })
+                      (λ i, first_step_zero_in_homology b G ϕ i _) 
+
+noncomputable
+def lift_nat_trans_nth_map {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
+                           (G : C ⥤ chain_complex (Module R) ℕ)
+                           (H_acyclic : acyclic b G)
+                           (ϕ : (F ⋙ homology_functor (Module R) _ 0)
+                              ⟶ (G ⋙ homology_functor (Module R) _ 0))
+  : Π (n : ℕ),
+    Σ' (α : (F ⋙ homological_complex.eval _ _ n)       ⟶ (G ⋙ homological_complex.eval _ _ n))
+       (β : (F ⋙ homological_complex.eval _ _ (n + 1)) ⟶ (G ⋙ homological_complex.eval _ _ (n + 1))),
+    ∀ X : C, nat_trans.app β X ≫ (G.obj X).d (n + 1) n = (F.obj X).d (n + 1) n ≫ nat_trans.app α X
+| 0       := have H :
+              ∀ (i : (b (0 + 1)).indices),
+                (lift_nat_trans_deg0 b G ϕ).app ((b (0 + 1)).models i)
+                    ((F.obj ((b (0 + 1)).models i)).d (0 + 1) 0 ((b (0 + 1)).basis_elem i)) ∈
+                  linear_map.ker (homological_complex.d_from (G.obj ((b (0 + 1)).models i)) 0),
+             by simp,
+             ⟨lift_nat_trans_deg0 b G ϕ, lift_nat_trans_deg1 b G ϕ,
+              step_chain_map b G 0 (lift_nat_trans_deg0 b G ϕ) H
+                             (λ i, first_step_zero_in_homology b G ϕ i (H i))⟩
+| (n + 1) := match lift_nat_trans_nth_map n with
+             | ⟨prev, curr, h⟩ := 
+             have H :
+              ∀ (i : (b (n + 1 + 1)).indices),
+                curr.app ((b (n + 1 + 1)).models i)
+                    ((F.obj ((b (n + 1 + 1)).models i)).d (n + 1 + 1) (n + 1) ((b (n + 1 + 1)).basis_elem i)) ∈
+                  linear_map.ker (homological_complex.d_from (G.obj ((b (n + 1 + 1)).models i)) (n + 1)),
+             by { intro, simp, rw ← category_theory.comp_apply,
+                  rw homological_complex.d_from_eq _ (complex_shape.down_mk (n + 1) n rfl),
+                  rw ← category_theory.category.assoc, rw h, simp, 
+                  rw ← category_theory.comp_apply _ (homological_complex.d _ _ _),
+                  simp },
+             ⟨curr,
+              lift_nat_trans_step b G (n + 1) curr H
+                (by { intro, apply all_eq_zero_of_iso_zero, 
+                      apply H_acyclic, 
+                      apply nat.zero_lt_succ,
+                      right, refl }),
+              step_chain_map b G (n + 1) curr H
+                (by { intro, apply all_eq_zero_of_iso_zero, 
+                      apply H_acyclic, 
+                      apply nat.zero_lt_succ,
+                      right, refl })⟩
+             end
+
+noncomputable
+def lift_nat_trans {F : C ⥤ chain_complex (Module R) ℕ} (b : complex_functor_basis F)
+                   (G : C ⥤ chain_complex (Module R) ℕ)
                    (H_acyclic : acyclic b G)
                    (ϕ : (F ⋙ homology_functor (Module R) _ 0)
                       ⟶ (G ⋙ homology_functor (Module R) _ 0))
   : F ⟶ G :=
-  have ∀ (n : ℕ) (η : F ⋙ homological_complex.eval _ _ n ⟶ G ⋙ homological_complex.eval _ _ n)
-         (h : ∀ (X : C), (F.obj X).d (n + 1) n ≫ nat_trans.app η X
-                         ≫ homological_complex.d_from (G.obj X) n = 0)
-         (i : (b (n + 1)).indices),
-         nat_trans.app η ((b (n + 1)).models i) ((F.obj ((b (n + 1)).models i)).d (n + 1) n ((b (n + 1)).basis_elem i))
-         ∈ linear_map.ker (homological_complex.d_from (G.obj ((b (n + 1)).models i)) n)
-  := λ n η h i, congr_fun (congr_arg coe_fn (h ((b (n + 1)).models i))) ((b (n + 1)).basis_elem i),
-  chain_complex.mk_nat_trans_rec (lift_nat_trans_deg0 b G H_acyclic ϕ)
-                                 (λ n η h, lift_nat_trans_step b G H_acyclic n η (this n η h))
-                                 (λ n η h, step_chain_map b G H_acyclic n η (this n η h))
-
-lemma lift_nat_trans_app0 {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
-  (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
-  (H_acyclic : acyclic b G) (ϕ : (F ⋙ homology_functor (Module R) _ 0)
-                               ⟶ (G ⋙ homology_functor (Module R) _ 0)) 
-  (X : C) (i : (b 0).indices) (f : (b 0).models i ⟶ X)
-  (h : (G.obj X).d_from 0 (((lift_nat_trans b G H_acyclic ϕ).app X).f 0 ((b 0).get_basis X ⟨i, f⟩)) = 0)
-  : Module.to_homology ⟨((lift_nat_trans b G H_acyclic ϕ).app X).f 0 ((b 0).get_basis X ⟨i, f⟩), h⟩
-  = (G ⋙ homology_functor (Module R) _ 0).map f
-      (ϕ.app ((b 0).models i) (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩)) := 
-begin
-  transitivity Module.to_homology ⟨(lift_nat_trans_deg0 b G H_acyclic ϕ).app X ((b 0).get_basis X ⟨i, f⟩), by simp⟩,
-  refl,
-  dsimp [lift_nat_trans_deg0],
-  rw map_out_desc,
-  transitivity (G ⋙ homology_functor (Module R) _ 0).map f
-                (Module.to_homology ⟨preim_of_homology_class (G.obj ((b 0).models i)) 0
-                  (ϕ.app ((b 0).models i)
-                         (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩)), by simp⟩),
-  { simp only [homology.π_map_apply,
-               category_theory.functor.comp_map,
-               homology_functor_map,
-               homological_complex.eval_map],
-    delta Module.to_homology,
-    congr,
-    symmetry,
-    transitivity (cycles_map (G.map f) 0) (Module.to_cycles _), refl,
-    rw Module.cycles_map_to_cycles },
-  { cases (preim_of_homology_class_spec (G.obj ((b 0).models i)) 0
-                                      (ϕ.app ((b 0).models i)
-                                        (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩)))
-        with h' H,
-    congr,
-    exact H },
-end
+  homological_complex.mk_nat_trans
+    (λ n, (lift_nat_trans_nth_map b G H_acyclic ϕ n).fst)
+    (by { intros i j h X,
+          dsimp at h, subst h,
+          dsimp [lift_nat_trans_nth_map],
+          generalize : lift_nat_trans_nth_map b G H_acyclic ϕ j = p,
+          rcases p with ⟨prev, curr, h⟩,
+          delta lift_nat_trans_nth_map._match_1, simp,
+          apply h })
 
 lemma lift_nat_trans_spec {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
                           (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
@@ -528,65 +834,12 @@ lemma lift_nat_trans_spec {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : 
                              ⟶ (G ⋙ homology_functor (Module R) _ 0)) 
   : whisker_right (lift_nat_trans b G H_acyclic ϕ) (homology_functor (Module R) _ 0) = ϕ := 
 begin
-  ext X : 2,
-  apply homology.ext,
-  have : kernel_subobject (homological_complex.d_from (F.obj X) 0) = ⊤, simp, 
-  rw ← category_theory.subobject.is_iso_iff_mk_eq_top at this,
-  let f : kernel (homological_complex.d_from (F.obj X) 0)
-        ≅ (F.obj X).X 0 := @category_theory.as_iso _ _ _ _ _ this,
-  let f' : ↑ (kernel_subobject (homological_complex.d_from (F.obj X) 0))
-        ≅ (F.obj X).X 0,
-  { transitivity,
-    apply category_theory.subobject.underlying_iso,
-    exact f },
-  refine (category_theory.iso.cancel_iso_hom_left f'.symm _ _).mp _,
-  apply basis.ext ((b 0).get_basis X),
-  intro p, cases p with i f,
-  simp only [category_theory.whisker_right_app,
-            category_theory.iso.trans_symm,
-            category_theory.as_iso_inv,
-            function.comp_app,
-            category_theory.iso.symm_hom,
-            category_theory.category.assoc,
-            Module.coe_comp,
-            category_theory.iso.trans_hom],
-  transitivity (ϕ.app X) (Module.to_homology ⟨(b 0).get_basis X ⟨i, f⟩, (by simp)⟩),
-  { transitivity (homology_functor (Module R) (complex_shape.down ℕ) 0).map ((lift_nat_trans b G H_acyclic ϕ).app X)
-                  (Module.to_homology ⟨(b 0).get_basis X ⟨i, f⟩, (by simp)⟩),
-    { congr, symmetry, 
-      apply category_theory.eq_app_inv_of_app_hom_eq (@category_theory.as_iso _ _ _ _ _ this),
-      simp },
-    { dsimp [homology_functor],
-      simp,
-      rw (_ : (kernel_subobject_map (homological_complex.hom.sq_from ((lift_nat_trans b G H_acyclic ϕ).app X) 0))
-            = cycles_map ((lift_nat_trans b G H_acyclic ϕ).app X) 0),
-      rw Module.cycles_map_to_cycles,
-      dsimp [subtype.val],
-      transitivity, apply lift_nat_trans_app0,
-      rw [← category_theory.comp_apply (ϕ.app ((b 0).models i)) _],
-      rw ← ϕ.naturality,
-      refine congr_arg (coe_fn (ϕ.app X)) _,
-      simp, delta Module.to_homology,
-      congr,
-      transitivity, apply Module.cycles_map_to_cycles,
-      apply congr_arg Module.to_cycles,
-      congr, symmetry, apply basis.mk_apply,
-      refl } },
-  { apply congr_arg,
-    delta Module.to_homology,
-    delta Module.to_cycles,
-    congr,
-    simp,
-    rw [← category_theory.comp_apply],
-    transitivity ((subobject.underlying_iso (kernel.ι (homological_complex.d_from (F.obj X) 0)))
-                  ≪≫ (@category_theory.as_iso _ _ _ _ _ this)).inv
-                    (((F ⋙ homological_complex.eval (Module R) _ 0).map f) ((b 0).basis_elem i)),
-    { apply category_theory.eq_app_inv_of_app_hom_eq
-              ((subobject.underlying_iso (kernel.ι (homological_complex.d_from (F.obj X) 0)))
-                ≪≫ (@category_theory.as_iso _ _ _ _ _ this)),
-      simp,
-      apply basis.mk_apply },
-    simp, congr, symmetry, apply basis.mk_apply }
+  ext X x,
+  cases x with x h,
+  rw ← lift_nat_trans_deg0_is_lift b G ϕ X x h (by simp),
+  delta Module.to_homology, simp,
+  refine congr_arg _ _,
+  apply Module.cycles_map_to_cycles
 end
 
 noncomputable
@@ -685,7 +938,9 @@ def chain_htpy_of_lifts_step {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b
   : (F ⋙ homological_complex.eval _ _ (n + 1)) ⟶ (G ⋙ homological_complex.eval _ _ (n + 2)) :=
   (b (n + 1)).map_out (G ⋙ homological_complex.eval _ _ (n + 2))
                       (λ i, preim_cycle_of_homology_zero (G.obj ((b (n + 1)).models i)) (n + 2) (n + 1) rfl
-                                                         (H_acyclic n i).right
+                                                         (by { apply H_acyclic,
+                                                               apply nat.zero_lt_succ,
+                                                               left, refl })
                                                          ((whisker_right α (homological_complex.eval (Module R) _ (n + 1))
                                                            - whisker_right β (homological_complex.eval (Module R) _ (n + 1))
                                                            - (homological_complex.d_nat_trans F (n + 1) n ≫ s)).app
@@ -764,7 +1019,6 @@ def lift_nat_trans_unique {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : 
             x
             y
 
--- should be a lemma but I get weird errors if I do?
 lemma lifts_of_nat_trans_H0_give_same_map_in_homology 
   {F : C ⥤ chain_complex (Module.{vmod'} R) ℕ} (b : complex_functor_basis F)
   (G : C ⥤ chain_complex (Module.{vmod'} R) ℕ)
