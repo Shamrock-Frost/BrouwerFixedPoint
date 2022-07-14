@@ -13,7 +13,8 @@ import topology.category.CompHaus.default
 import topology.homotopy.product topology.homotopy.contractible
 import analysis.convex.contractible
 import data.opposite data.finset.pointwise
-import .simplices .instances .general_topology .homological_algebra .linear_algebra
+import .simplices .instances .general_topology .homological_algebra .linear_algebra 
+import .acyclic_models_theorem .singular_homology_definitions
 
 open category_theory algebraic_topology
 
@@ -318,29 +319,6 @@ end
 section
 
 noncomputable
-def free_complex_on_sset (R : Type*) [comm_ring R] : sSet ⥤ chain_complex (Module R) ℕ :=
-  ((simplicial_object.whiskering _ _).obj (Module.free R)) ⋙ alternating_face_map_complex _
-
-noncomputable
-def singular_chain_complex (R : Type*) [comm_ring R] : Top ⥤ chain_complex (Module R) ℕ :=
-  Top.to_sSet ⋙ free_complex_on_sset R
-
-noncomputable
-def singular_homology (R : Type*) [comm_ring R] (n : ℕ) : Top ⥤ Module R :=
-  singular_chain_complex R ⋙ homology_functor _ _ n
-
-noncomputable
-def singular_zero_simplex_of_pt {X : Top} (x0 : X)
-  : (Top.to_sSet.obj X).obj (opposite.op (simplex_category.mk 0)) := 
-  (continuous_map.const (topological_simplex 0) x0)
-
-noncomputable
-def simplex_to_chain {n : ℕ} {X : sSet}
-  (σ : X.obj (opposite.op (simplex_category.mk n)))
-  (R : Type*) [comm_ring R] : ((free_complex_on_sset R).obj X).X n :=
-  finsupp.single σ 1
-
-noncomputable
 def ε_map (R : Type*) [comm_ring R] {X : Top} (x0 : X) : Π (n : ℕ),
   ((singular_chain_complex R).obj X).X n → ((singular_chain_complex R).obj X).X n
 | 0 := λ x, finsupp.sum x (λ _ n, n • simplex_to_chain (singular_zero_simplex_of_pt x0) R)
@@ -362,52 +340,6 @@ def ε_hom (R : Type*) [comm_ring R] {X : Top} (x0 : X) (n : ℕ) :
         intro, apply zero_smul },
       symmetry, apply smul_zero }
   }
-
-open_locale big_operators
-
-lemma singular_chain_complex_differential_desc (R : Type*) [comm_ring R] {X : Top} {n : ℕ}
-  (σ : topological_simplex (n + 1) ⟶ X)
-  : ((singular_chain_complex R).obj X).d (n + 1) n (finsupp.single σ 1)
-  = ∑ (i : fin (n + 2)), (-1 : ℤ)^(i : ℕ)
-  • simplex_to_chain (simplex_category.to_Top.map (simplex_category.δ i) ≫ σ) R := by {
-    dsimp [singular_chain_complex, free_complex_on_sset],
-    transitivity (alternating_face_map_complex.obj_d
-                     (((simplicial_object.whiskering Type (Module R)).obj (Module.free R)).obj
-                                                                         (Top.to_sSet.obj X)) n)
-                     .to_fun
-                     (finsupp.single σ 1),
-    { congr, apply chain_complex.of_d },
-    { simp [alternating_face_map_complex.obj_d],
-      congr, ext i, congr,
-      dsimp [simplex_to_chain],
-      rw finsupp.eq_single_iff, split,
-      { intros t h,
-        rw finset.mem_singleton,
-        simp at h,
-        have : ((Module.free R).map ((Top.to_sSet.obj X).δ i) (finsupp.single σ 1)).to_fun t ≠ 0 := h,
-        simp at this,
-        exact and.left (finsupp.single_apply_ne_zero.mp this) },
-      { change (((Module.free R).map ((Top.to_sSet.obj X).δ i) (finsupp.single σ 1)).to_fun
-                  (simplex_category.to_Top.map (simplex_category.δ i) ≫ σ) = 1),
-        simp,
-        exact finsupp.single_eq_same } }
-  }
-
-lemma singular_chain_complex_differential_desc_deg_0 (R : Type*) [comm_ring R] {X : Top}
-  (σ : topological_simplex 1 ⟶ X)
-  : ((singular_chain_complex R).obj X).d 1 0 (finsupp.single σ 1)
-  = simplex_to_chain (simplex_category.to_Top.map (@simplex_category.δ 0 0) ≫ σ) R 
-  - simplex_to_chain (simplex_category.to_Top.map (@simplex_category.δ 0 1) ≫ σ) R :=
-begin
-  rw singular_chain_complex_differential_desc,
-  rw finset.sum_eq_add_of_mem (0 : fin 2) 1 (finset.mem_univ _) (finset.mem_univ _),
-  { simp, rw sub_eq_add_neg },
-  { simp },
-  { intros c H' H, exfalso, cases c with c hc, cases H,
-    cases c, contradiction, cases c, contradiction,
-    rw [nat.succ_lt_succ_iff, nat.succ_lt_succ_iff] at hc,
-    exact not_lt_zero' hc }
-end
 
 noncomputable
 def ε (R : Type*) [comm_ring R] {X : Top} (x0 : X) 
@@ -625,29 +557,6 @@ local attribute [instance]
   category_theory.concrete_category.has_coe_to_fun
 
 open category_theory.limits
-
-lemma iso_zero_of_id_eq_zero (R : Type*) [comm_ring R] (M : Module R)
-  (h : 𝟙 M = 0) : is_isomorphic M 0 :=
-    ⟨is_zero.iso_zero (@Module.is_zero_of_subsingleton _ _ M
-                         ⟨λ x y, calc x = (𝟙 M : M ⟶ M) x : rfl
-                                    ... = (0 : M ⟶ M) x   : congr_fun (congr_arg _ h) x
-                                    ... = (0 : M ⟶ M) y   : rfl
-                                    ... = (𝟙 M : M ⟶ M) y : (congr_fun (congr_arg _ h) y).symm⟩)⟩
-
-lemma homology_at_ith_index_zero {ι : Type*} (V : Type*) [category V] [has_zero_morphisms V]
-                                 (c : complex_shape ι) [has_zero_object V] [has_equalizers V]
-                                 [has_images V] [has_image_maps V] [has_cokernels V]
-                                 {X Y : homological_complex V c}
-                                 (f : X ⟶ Y) (i : ι) (H : f.f i = 0)
-                                 : (homology_functor V c i).map f = 0 :=
-begin
-  simp,
-  ext, simp,
-  suffices : kernel_subobject_map (homological_complex.hom.sq_from f i) = 0,
-  { rw this, simp },
-  ext, simp,
-  rw H, simp
-end
 
 lemma homology_of_contractible_space (R : Type*) [comm_ring R] (X : Top) (h : contractible_space X)
   : ∀ (i : ℕ), 0 < i → is_isomorphic ((singular_homology R i).obj X) 0 := 

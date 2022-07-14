@@ -1,5 +1,27 @@
 import linear_algebra.linear_independent
+import algebra.category.Module.abelian
+import algebra.category.Module.images
+import algebra.homology.homology
+import algebra.homology.Module
+import algebra.homology.homotopy
 import algebra.big_operators.finsupp
+
+lemma submodule_restrict_app {R : Type*}
+  {M₁ : Type*} {M₂ : Type*} {M₃ : Type*}
+  [semiring R] [add_comm_monoid M₁] [add_comm_monoid M₂] [add_comm_monoid M₃]
+  [module R M₁] [module R M₂] [module R M₃]
+  (p : submodule R M₂) (q : submodule R M₃)
+  (f : M₁ →ₗ[R] M₂) (g : M₂ →ₗ[R] M₃)
+  (hf : ∀ (x : M₁), f x ∈ p)
+  (hg : ∀ (y : p), g.dom_restrict p y ∈ q)
+  (x : M₁)
+  : linear_map.cod_restrict q (linear_map.dom_restrict g p) 
+      hg
+      (linear_map.cod_restrict p f hf x)
+  = linear_map.cod_restrict q (g.comp f) (λ x, hg ⟨f x, hf x⟩) x :=
+begin
+  ext, refl
+end
 
 lemma free_module_basis_linear_independent
     (R : Type*) [ring R] (X : Type*)
