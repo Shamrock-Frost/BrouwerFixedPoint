@@ -685,33 +685,36 @@ end
 lemma singular_homology.homotopy_invariant (R : Type*) [comm_ring R]
   (n : ℕ) (X Y : Top) (f g : X ⟶ Y) (H : continuous_map.homotopy f g)
   : (singular_homology R n).map f = (singular_homology R n).map g :=
-  by {
+begin
     have :=
     lifts_of_nat_trans_H0_give_same_map_in_homology
       (singular_chain_complex_basis R)
       (cylinder ⋙ singular_chain_complex R)
-      (λ n k hn hk i, 
-        have H : contractible_space (unit_interval × topological_simplex k),
-        by { apply prod_of_contractible_contractible,
-               { apply convex.contractible_space,
-                 apply @convex_Icc ℝ ℝ _ _ _ _ 0 1,
-                 existsi (0 : ℝ), simp },
-               { rw homeomorph.contractible_space_iff (topological_simplex_alt_desc k),
-                 apply convex.contractible_space,
-                 { intros x y hx hy s t hs ht hsum,
-                   split,
-                   { intro i, rw [pi.add_apply, pi.smul_apply, pi.smul_apply],
-                     have hxi := hx.left i, have hyi := hy.left i,
-                     apply @convex_Ici ℝ ℝ _ _ _ _ 0; assumption },
-                   { rw ← hsum,
-                     transitivity (s • (finset.univ.sum x)) + (t • (finset.univ.sum y)),
-                     rw [finset.smul_sum, finset.smul_sum, ← finset.sum_add_distrib],
-                     congr, 
-                     rw [hx.right, hy.right],
-                     simp } },
-                 { existsi (topological_simplex_alt_desc k (vertex k 1)).val,
-                   exact (topological_simplex_alt_desc k (vertex k 1)).property } } },
-        homology_of_contractible_space R (Top.of (unit_interval × topological_simplex k)) H n hn)
+      (λ n hn, 
+        have H : ∀ k, contractible_space (unit_interval × topological_simplex k),
+        by { intro k, apply prod_of_contractible_contractible,
+             { apply convex.contractible_space,
+               apply @convex_Icc ℝ ℝ _ _ _ _ 0 1,
+               existsi (0 : ℝ), simp },
+             { rw homeomorph.contractible_space_iff (topological_simplex_alt_desc k),
+               apply convex.contractible_space,
+               { intros x y hx hy s t hs ht hsum,
+                 split,
+                 { intro i, rw [pi.add_apply, pi.smul_apply, pi.smul_apply],
+                   have hxi := hx.left i, have hyi := hy.left i,
+                   apply @convex_Ici ℝ ℝ _ _ _ _ 0; assumption },
+                 { rw ← hsum,
+                   transitivity (s • (finset.univ.sum x)) + (t • (finset.univ.sum y)),
+                   rw [finset.smul_sum, finset.smul_sum, ← finset.sum_add_distrib],
+                   congr, 
+                   rw [hx.right, hy.right],
+                   simp } },
+               { existsi (topological_simplex_alt_desc k (vertex k 1)).val,
+                 exact (topological_simplex_alt_desc k (vertex k 1)).property } } },
+        let H' (k : ℕ) (hk : k > 0) (i : (singular_chain_complex_basis R k).indices) :=
+          homology_of_contractible_space R (Top.of (unit_interval × topological_simplex k))
+                                         (H k) n hn
+        in ⟨H' n hn, H' (n + 1) (nat.zero_lt_succ n)⟩)
     (whisker_right (inclusion_at_t_nat_trans 0) (singular_chain_complex R))
     (whisker_right (inclusion_at_t_nat_trans 1) (singular_chain_complex R)) _ n X,
     rw (_ : f = (inclusion_at_t_nat_trans 0).app _ ≫ H.to_continuous_map),
@@ -721,7 +724,7 @@ lemma singular_homology.homotopy_invariant (R : Type*) [comm_ring R]
     have := congr_arg (λ f, f ≫ @category_theory.functor.map _ _ _ _ (singular_homology R n) (Top.of (unit_interval × X)) (Top.of Y) (H.to_continuous_map)) this,
     refine eq.trans _ (eq.trans this _);
     rw (singular_homology R n).map_comp'; refl,
-    apply functor_basis.homology_map_ext (singular_chain_complex_basis R 0),
+    apply functor_basis.homology_ext (singular_chain_complex_basis R 0),
     intro i, cases i,
     refine exists.intro (simplex_to_chain _ R) _,
     { refine ⟨(λ p, (⟨(p.val 0).val, (p.val 0).property, topological_simplex.coord_le_one 1 0 p⟩,
@@ -754,6 +757,7 @@ lemma singular_homology.homotopy_invariant (R : Type*) [comm_ring R]
       refine eq.trans this.symm _,
       congr,
       simp, 
-      apply @unique.eq_default _ topological_simplex.point_unique } }
+      apply @unique.eq_default _ topological_simplex.point_unique }
+end
 
 end

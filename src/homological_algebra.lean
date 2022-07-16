@@ -139,6 +139,12 @@ def chain_complex.mk_natural_chain_homotopy_rec
     Hinit
     (by { intros n X, simp, apply Hstep })
 
+-- I don't know the rules on when instances should be global
+instance [has_zero_object V] (C : chain_complex V ℕ)
+  : is_iso (kernel_subobject (C.d_from 0)).arrow :=
+  by { rw C.d_from_eq_zero chain_complex.next_nat_zero,
+       exact limits.is_iso_kernel_subobject_zero_arrow }
+
 end chain_complex
 
 section Modules
@@ -178,28 +184,31 @@ lemma Module.to_homology_def
   = Module.as_hom_right (is_linear_map.mk' _ (Module.to_cycles.homomorphism C i))
   ≫ homology.π (C.d_to i) (C.d_from i) _ := by { ext : 1, refl }
 
+lemma Module.to_cycles_def
+  (C : homological_complex (Module.{v'} R) c) {i : ι}
+  : Module.as_hom_right (is_linear_map.mk' _ (Module.to_cycles.homomorphism C i))
+  = (category_theory.limits.kernel_subobject_iso (C.d_from i)
+    ≪≫ Module.kernel_iso_ker (C.d_from i)).inv := by { ext : 1, refl }
+
 lemma Module.to_cycles_is_iso (C : homological_complex (Module.{v'} R) c) (i : ι)
-  : is_iso (Module.as_hom (is_linear_map.mk' _ (Module.to_cycles.homomorphism C i))) :=
-begin
-  delta Module.to_cycles, simp [Module.as_hom, is_linear_map.mk'],
-  refine ⟨⟨(kernel_subobject_iso (C.d_from i) ≪≫ Module.kernel_iso_ker (C.d_from i)).hom, _⟩⟩,
-  delta Module.to_kernel_subobject, split,
-  exact (kernel_subobject_iso (C.d_from i) ≪≫ Module.kernel_iso_ker (C.d_from i)).inv_hom_id,
-  exact (kernel_subobject_iso (C.d_from i) ≪≫ Module.kernel_iso_ker (C.d_from i)).hom_inv_id
-end
+  : is_iso (Module.as_hom_right (is_linear_map.mk' _ (Module.to_cycles.homomorphism C i))) :=
+  by { rw Module.to_cycles_def, apply is_iso.of_iso_inv }
 
 lemma Module.to_homology_comp_homology_functor_map
   {X Y : homological_complex (Module R) c} (f : X ⟶ Y) (i : ι)
-  : Module.of_hom (@is_linear_map.mk' R (linear_map.ker (X.d_from i)) (X.homology i) _ _ _ _ _ 
-                    Module.to_homology (Module.to_homology.homomorphism X i))
+  : Module.as_hom_right (@is_linear_map.mk' R (linear_map.ker (X.d_from i)) (X.homology i)
+                                            _ _ _ _ _ 
+                                            Module.to_homology
+                                            (Module.to_homology.homomorphism X i))
   ≫ (homology_functor (Module R) c i).map f
   = Module.of_hom 
       (linear_map.cod_restrict (linear_map.ker (Y.d_from i)) 
         (linear_map.dom_restrict (f.f i) (linear_map.ker (X.d_from i)))
         (by intros; simp))
-  ≫ Module.of_hom (is_linear_map.mk' Module.to_homology (Module.to_homology.homomorphism Y i)) :=
+  ≫ Module.as_hom_right (is_linear_map.mk' Module.to_homology
+                                           (Module.to_homology.homomorphism Y i)) :=
 begin
-  ext, cases x, simp, delta Module.to_homology, congr,
+  ext, cases x, simp [Module.as_hom_right], delta Module.to_homology, congr,
   transitivity, apply Module.cycles_map_to_cycles, refl
 end
 
@@ -261,8 +270,8 @@ lemma Module.to_homology_ext
             congr,
             rw [← comp_apply (iso.inv _), ← image_to_kernel'_kernel_subobject_iso,
                 comp_apply, ← comp_apply (iso.inv _), Module.image_to_kernel'_kernel_iso_ker],
-            apply eq_app_inv_of_app_hom_eq (kernel_subobject_iso (X.d_from j)),
-            apply eq_app_inv_of_app_hom_eq,
+            apply (kernel_subobject_iso (X.d_from j)).eq_app_inv_of_app_hom_eq,
+            apply iso.eq_app_inv_of_app_hom_eq,
             apply subtype.eq, 
             delta Module.to_cycles,
             simp [Module.range_to_ker, Module.to_kernel_subobject, Module.kernel_iso_ker] },
@@ -274,6 +283,33 @@ lemma Module.to_homology_ext
             { intro, simp, rw X.shape' i j h, refl },
             rw this,
             simp } })
+
+lemma Module.to_homology_eq_zero
+  {X : homological_complex (Module.{v'} R) c}
+  {i j : ι} (hij : c.rel i j)
+  {x : linear_map.ker (X.d_from j)}
+  : x.val ∈ linear_map.range (X.d i j) → Module.to_homology x = 0 :=
+begin
+  rintro ⟨w, h⟩,
+  transitivity Module.to_homology (0 : linear_map.ker (X.d_from j)),
+  apply Module.to_homology_ext w, symmetry, simp, exact h,
+  apply (Module.to_homology.homomorphism _ _).map_zero
+end
+
+lemma Module.homology_ext''
+  (C D : homological_complex (Module.{v'} R) c)
+  {h k : C ⟶ D} (i : ι)
+  (w : ∀ (x : C.X i), C.d_from i x = 0 →
+       ∃ (j : ι) (y : D.X j), h.f i x = k.f i x + D.d j i y)
+  : (homology_functor (Module.{v'} R) c i).map h = (homology_functor (Module.{v'} R) c i).map k :=
+begin
+  ext, cases x with x hx,
+  rw [homology_functor_map, homology_functor_map, homology.π_map_apply, homology.π_map_apply],
+  delta kernel_subobject_map, dsimp [hom.sq_from],
+  rw [Module.cycles_map_to_cycles, Module.cycles_map_to_cycles],
+  obtain ⟨j, y, hy⟩ := w x hx,
+  exact Module.to_homology_ext y hy
+end
 
 lemma homological_complex.range_d_eq
   (C : homological_complex (Module.{v'} R) c) {i j : ι} (hij : c.rel i j)
