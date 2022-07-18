@@ -1,7 +1,9 @@
 import topology.constructions
 import topology.separation
 import topology.category.Top.basic
-import topology.unit_interval
+import topology.homotopy.basic
+import analysis.convex.basic 
+import analysis.convex.star
 
 lemma quotient_map_of_is_closed_map {α β} [topological_space α] [topological_space β] 
   (f : α → β) : function.surjective f → is_closed_map f → continuous f → quotient_map f :=
@@ -52,3 +54,37 @@ def cylinder : Top.{u} ⥤ Top.{u} := {
   map_id' := by { intros, ext p, cases p, simp, refl },
   map_comp' := by { intros, ext p, cases p, simp, refl },
 }
+
+def homeomorph.Pi_to_subtype
+  {α : Type*} {β : α → Type*} {P : Π (a : α), β a → Prop}
+  [τ : Π (a : α), topological_space (β a)]
+  : { f : Π (a : α), β a // ∀ a, P a (f a) } ≃ₜ (Π (a : α), { b // P a b }) :=
+  equiv.subtype_pi_equiv_pi.to_homeomorph_of_inducing
+    ⟨by { simp [subtype.topological_space, Pi.topological_space, induced_compose], refl }⟩
+
+def homeomorph.subtype_prod_equiv_prod
+  {α : Type*} {β : Type*} {p : α → Prop} {q : β → Prop} 
+  [tα : topological_space α] [tβ : topological_space β]
+  : {c : α × β // p c.fst ∧ q c.snd} ≃ₜ {a // p a} × {b // q b} :=
+  equiv.subtype_prod_equiv_prod.to_homeomorph_of_inducing
+    ⟨by { simp [subtype.topological_space, prod.topological_space, induced_inf, induced_compose],
+          refl }⟩
+
+variables {E : Type*} [add_comm_group E] [module ℝ E] [topological_space E]
+  [has_continuous_add E] [has_continuous_smul ℝ E] {s : set E} {x : E}
+
+/-- A non-empty star convex set is a contractible space. -/
+def star_convex.contraction (h : star_convex ℝ x s) (h' : s.nonempty) :
+  (continuous_map.id s).homotopy
+    (continuous_map.const s ⟨x, star_convex.mem h h'⟩) := {
+    to_fun := λ p, ⟨p.1.1 • x + (1 - p.1.1) • p.2,
+                    h p.2.2 p.1.2.1 (sub_nonneg.2 p.1.2.2) (add_sub_cancel'_right _ _)⟩,
+    map_zero_left' := λ _, by simp,
+    map_one_left' := λ _, by simp,
+  }
+
+/-- A non-empty convex set is a contractible space. -/
+noncomputable
+lemma convex.contraction (hs : convex ℝ s)
+  : Π (x0 : s), (continuous_map.id s).homotopy (continuous_map.const s x0)
+| ⟨x0, h⟩ := (hs.star_convex h).contraction ⟨x0, h⟩

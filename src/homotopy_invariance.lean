@@ -629,40 +629,6 @@ begin
   congr; ext; cases a; refl
 end
 
--- Should probably use this in more places?
-noncomputable
-def topological_simplex_alt (n : ℕ) :=
-  Top.of { f : fin (n + 1) → ℝ | (∀ i, 0 ≤ f i) ∧ (finset.univ.sum f = 1) }
-
-def topological_simplex_alt_desc (n : ℕ) : topological_simplex n ≃ₜ topological_simplex_alt n := {
-  to_fun := λ x, ⟨λ i, (x.val i).val, λ i, (x.val i).property,
-                    by { have := (congr_arg subtype.val x.property),
-                        refine eq.trans _ this,
-                        symmetry, 
-                        simp at this,
-                        have := map_sum (⟨subtype.val, _, _⟩ : nnreal →+ ℝ) x.val finset.univ,
-                        swap, { refl }, swap, { rintros ⟨x, _⟩ ⟨y, _⟩, simp },
-                        refine eq.trans this _,
-                        congr }⟩,
-  inv_fun := λ x, ⟨λ i, ⟨x.val i, x.property.left i⟩,
-                     by { refine subtype.eq _,
-                         have := x.property.right,
-                         refine eq.trans _ this,
-                         let f : fin (n + 1) → nnreal := λ i, ⟨x.val i, x.property.left i⟩,
-                         have := map_sum (⟨subtype.val, _, _⟩ : nnreal →+ ℝ) f finset.univ,
-                         swap, { refl }, swap, { rintros ⟨x, _⟩ ⟨y, _⟩, simp },
-                         refine eq.trans this _,
-                         congr }⟩,
-  left_inv := λ x, by simp,
-  right_inv := λ x, by simp,
-  continuous_to_fun := by { simp, continuity,
-                            apply continuous.congr ((continuous_apply i).comp continuous_subtype_coe), 
-                            simp },
-  continuous_inv_fun := by { simp, continuity,
-                             apply continuous.congr ((continuous_apply i).comp continuous_subtype_coe), 
-                             simp }
-}
-
 def inclusion_at_t_nat_trans (t : unit_interval) : category_theory.functor.id Top ⟶ cylinder := {
   app := λ X, ⟨λ x, (t, x), by continuity⟩
 }

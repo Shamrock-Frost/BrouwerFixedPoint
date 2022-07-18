@@ -1,5 +1,6 @@
 import algebraic_topology.simplex_category
 import algebraic_topology.topological_simplex
+import analysis.convex.basic
 
 local attribute [instance]
   category_theory.concrete_category.has_coe_to_sort
@@ -41,6 +42,39 @@ instance topological_simplex.point_unique : unique (topological_simplex 0) := {
   }
 }
 
+-- Should probably use this in more places?
+noncomputable
+def topological_simplex_alt (n : ℕ) := Top.of (std_simplex ℝ (fin (n + 1)))
+
+def topological_simplex_alt_desc (n : ℕ) : topological_simplex n ≃ₜ topological_simplex_alt n := {
+  to_fun := λ x, ⟨λ i, (x.val i).val, λ i, (x.val i).property,
+                    by { have := (congr_arg subtype.val x.property),
+                        refine eq.trans _ this,
+                        symmetry, 
+                        simp at this,
+                        have := map_sum (⟨subtype.val, _, _⟩ : nnreal →+ ℝ) x.val finset.univ,
+                        swap, { refl }, swap, { rintros ⟨x, _⟩ ⟨y, _⟩, simp },
+                        refine eq.trans this _,
+                        congr }⟩,
+  inv_fun := λ x, ⟨λ i, ⟨x.val i, x.property.left i⟩,
+                     by { refine subtype.eq _,
+                         have := x.property.right,
+                         refine eq.trans _ this,
+                         let f : fin (n + 1) → nnreal := λ i, ⟨x.val i, x.property.left i⟩,
+                         have := map_sum (⟨subtype.val, _, _⟩ : nnreal →+ ℝ) f finset.univ,
+                         swap, { refl }, swap, { rintros ⟨x, _⟩ ⟨y, _⟩, simp },
+                         refine eq.trans this _,
+                         congr }⟩,
+  left_inv := λ x, by simp,
+  right_inv := λ x, by simp,
+  continuous_to_fun := by { simp, continuity,
+                            apply continuous.congr ((continuous_apply i).comp continuous_subtype_coe), 
+                            simp },
+  continuous_inv_fun := by { simp, continuity,
+                             apply continuous.congr ((continuous_apply i).comp continuous_subtype_coe), 
+                             simp }
+}
+
 noncomputable
 def inclusion (n : ℕ) : topological_simplex n ⟶ topological_simplex (n + 1) := 
   simplex_category.to_Top.map (simplex_category.δ 0)
@@ -50,10 +84,6 @@ def const_vertex (n : ℕ) (i : simplex_category.mk (n + 1))
   : topological_simplex n ⟶ topological_simplex (n + 1) :=
   simplex_category.to_Top.map (simplex_category.squash n
                                 ≫ simplex_category.const (simplex_category.mk (n+1)) i)
-
--- noncomputable 
--- def const (n : ℕ) : topological_simplex n ⟶ topological_simplex (n + 1) :=
---   const_idx n 0
 
 noncomputable
 def vertex (n : ℕ) (i : simplex_category.mk n) : topological_simplex n 
