@@ -9,6 +9,8 @@ import algebra.homology.homotopy
 import algebraic_topology.simplex_category
 import algebraic_topology.topological_simplex
 
+import .homological_algebra
+
 open category_theory algebraic_topology
 open_locale big_operators
 
@@ -20,25 +22,19 @@ noncomputable
 def singular_chain_complex (R : Type*) [comm_ring R] : Top ⥤ chain_complex (Module R) ℕ :=
   Top.to_sSet ⋙ free_complex_on_sset R
 
--- Should be in homological algebra file probably
--- noncomputable
--- def coker_functor (V : Type*) [category V] [limits.has_zero_morphisms V] [limits.has_cokernels V]
---   : arrow V ⥤ V := {
---     obj := λ f, limits.cokernel f.hom,
---     map := λ f g φ, limits.cokernel.map _ _ _ _ φ.w.symm,
---     map_id' := by { intro, ext, simp, apply category.id_comp },
---     map_comp' := by { intros, ext, simp }
---   }
-
--- noncomputable
--- def singular_chain_complex_of_pair (R : Type*) [comm_ring R]
---   : arrow Top ⥤ chain_complex (Module R) ℕ := 
---   category_theory.functor.map_arrow (singular_chain_complex R)
---   ⋙ coker_functor (chain_complex (Module R) ℕ)
+noncomputable
+def singular_chain_complex_of_pair (R : Type*) [comm_ring R]
+  : arrow Top ⥤ chain_complex (Module R) ℕ := 
+  category_theory.functor.map_arrow (singular_chain_complex R)
+  ⋙ coker_functor (chain_complex (Module R) ℕ)
 
 noncomputable
 def singular_homology (R : Type*) [comm_ring R] (n : ℕ) : Top ⥤ Module R :=
   singular_chain_complex R ⋙ homology_functor _ _ n
+
+noncomputable
+def singular_homology_of_pair (R : Type*) [comm_ring R] (n : ℕ) : arrow Top ⥤ Module R :=
+  singular_chain_complex_of_pair R ⋙ homology_functor _ _ n
 
 noncomputable
 def singular_zero_simplex_of_pt {X : Top} (x0 : X)

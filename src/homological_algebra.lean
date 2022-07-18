@@ -3,6 +3,9 @@ import algebra.category.Module.images
 import algebra.homology.homology
 import algebra.homology.Module
 import algebra.homology.homotopy
+
+import for_mathlib.homological_complex_abelian
+
 import .category_theory .linear_algebra
 
 section 
@@ -14,12 +17,29 @@ local attribute [instance]
   category_theory.concrete_category.has_coe_to_sort
   category_theory.concrete_category.has_coe_to_fun
 
+noncomputable
+def coker_functor (V : Type*) [category V] [has_zero_morphisms V] [has_cokernels V]
+  : arrow V ⥤ V := {
+    obj := λ f, cokernel f.hom,
+    map := λ f g φ, cokernel.map _ _ _ _ φ.w.symm,
+    map_id' := by { intro, ext, simp, apply category.id_comp },
+    map_comp' := by { intros, ext, simp }
+  }
+
+lemma coker_map_spec {V : Type*} [category V] [has_zero_morphisms V] [has_cokernels V]
+  {A B X Y : V}
+  (i : A ⟶ X) (j : B ⟶ Y)
+  (f' : A ⟶ B) (f : X ⟶ Y)
+  (w1 : i ≫ f = f' ≫ j)
+  : cokernel.π i ≫ cokernel.map i j f' f w1 = f ≫ cokernel.π j :=
+  by { delta cokernel.π coequalizer.π cokernel.map, simp }
+
 section general_abelian_category
 
-universes u u' v v' idx
+universes u u' v v'
 
 parameters {C : Type u} {V : Type v} [category.{u'} C] [category.{v'} V]
-parameters {ι : Type idx} {c : complex_shape ι}
+parameters {ι : Type} {c : complex_shape ι}
 
 lemma id_eq_zero_of_iso_zero [has_zero_object V] [has_zero_morphisms V] [has_cokernels V] (X : V)
   : is_isomorphic X 0 → 𝟙 X = 0
@@ -60,10 +80,124 @@ def homological_complex.d_nat_trans [has_zero_morphisms V]
 
 structure natural_chain_homotopy [preadditive V]
   {F G : C ⥤ homological_complex V c} (α β : nat_trans F G)
-  : Type (max u (max v (v' + 1)) idx) :=
+  : Type (max u (max v (v' + 1))) :=
 (to_chain_htpy : ∀ X, @homotopy ι V _ _ c (F.obj X) (G.obj X) (α.app X) (β.app X))
 (naturality : ∀ X Y (f : X ⟶ Y) i j, c.rel i j → (F.map f).f j ≫ (to_chain_htpy Y).hom j i
                                                 = (to_chain_htpy X).hom j i ≫ (G.map f).f i)
+
+
+protected def parallel_pair_comp_has_colim 
+  {V : Type*} [category V] {ι : Type} {c : complex_shape ι}
+  [has_zero_morphisms V] [has_cokernels V]
+  {X Y : homological_complex V c} (f : X ⟶ Y) (p : ι)
+  : has_colimit (parallel_pair f 0 ⋙ eval V c p) := by {
+    rw parallel_pair_comp, dsimp, apply_instance
+  }
+
+local attribute [instance] parallel_pair_comp_has_colim
+
+noncomputable
+def coker_of_chain_map_at [has_zero_morphisms V] [has_cokernels V]
+  {X Y : homological_complex V c} (f : X ⟶ Y) (p : ι)
+  : cocone (parallel_pair (f.f p) 0) :=
+  parallel_pair_comp.cocone_comp_to_cocone_pair (eval V c p : homological_complex V c ⥤ V) f 0
+                                                ((eval V c p).map_cocone
+                                                  (colimit.cocone (parallel_pair f 0)))
+
+noncomputable
+def coker_of_chain_map_at_is_colimit [has_zero_morphisms V] [has_cokernels V]
+  {X Y : homological_complex V c} (f : X ⟶ Y) (p : ι)
+  : is_colimit (coker_of_chain_map_at f p) :=
+    parallel_pair_comp.is_colimit_comp_to_is_colimit_pair _ _ _ _
+      (is_colimit_of_preserves (eval V c p) (colimit.is_colimit (parallel_pair f 0)))
+
+noncomputable
+def chain_homotopy_on_coker_of_compatible_chain_homotopies
+  [preadditive V] [has_cokernels V]
+  {A B X Y : homological_complex V c}
+  (i : A ⟶ X) (j : B ⟶ Y)
+  (f' g' : A ⟶ B) (f g : X ⟶ Y)
+  (w1 : f' ≫ j = i ≫ f) (w2 : g' ≫ j = i ≫ g)
+  (s' : homotopy f' g') (s : homotopy f g)
+  (comm : s'.comp_right j = (homotopy.of_eq w1).trans ((s.comp_left i).trans (homotopy.of_eq w2.symm)))
+  : homotopy ((coker_functor (homological_complex V c)).map (arrow.hom_mk w1 : arrow.mk i ⟶ arrow.mk j))
+             ((coker_functor (homological_complex V c)).map (arrow.hom_mk w2 : arrow.mk i ⟶ arrow.mk j)) := {
+  hom := λ p q, is_colimit.desc
+                  (coker_of_chain_map_at_is_colimit i p)
+                  (cofork.of_π (s.hom p q ≫ cofork.π (coker_of_chain_map_at j q)) 
+                  (by { rw [zero_comp, ← category.assoc],
+                        have := congr_arg (λ h, homotopy.hom h p q) comm, simp at this,
+                        rw [← this, category.assoc, cokernel_cofork.condition, comp_zero] })),
+  zero' := by { intros p q h,
+                have : i.f p ≫ 0 = 0 ≫ 0 := eq.trans comp_zero comp_zero.symm,
+                transitivity (coker_of_chain_map_at_is_colimit i p).desc (cofork.of_π 0 this),
+                { congr, rw s.zero' p q h, exact zero_comp },
+                { symmetry,
+                  refine (coker_of_chain_map_at_is_colimit i p).uniq' (cofork.of_π 0 this) 0 _,
+                  intro u, cases u; simp } },
+  comm := by { intro p,
+               have H : ∀ (h' : A ⟶ B) (h : X ⟶ Y) (w : h' ≫ j = i ≫ h),
+                        i.f p ≫ homological_complex.hom.f h p
+                              ≫ cofork.π (coker_of_chain_map_at j p)
+                      = 0 ≫ homological_complex.hom.f h p ≫ cofork.π (coker_of_chain_map_at j p),
+               { intros h' h w, rw [zero_comp, ← category.assoc],
+                 have := congr_arg (λ h, homological_complex.hom.f h p) w, dsimp at this,
+                 rw [← this, category.assoc, cokernel_cofork.condition, comp_zero] },
+               have : ∀ (h' : A ⟶ B) (h : X ⟶ Y) (w : h' ≫ j = i ≫ h),
+                        ((coker_functor (homological_complex V c)).map
+                          (arrow.hom_mk w : arrow.mk i ⟶ arrow.mk j)).f p
+                      = is_colimit.desc
+                          (coker_of_chain_map_at_is_colimit i p)
+                          (cofork.of_π (h.f p ≫ cofork.π (coker_of_chain_map_at j p)) (H h' h w)),
+               { intros h' h w,
+                 apply (coker_of_chain_map_at_is_colimit i p).uniq'
+                         (cofork.of_π (h.f p ≫ cofork.π (coker_of_chain_map_at j p)) (H h' h w)),
+                 intro u, cases u; simp,
+                 refine eq.trans (category.assoc _ _ _) _,
+                 refine eq.trans _ (category.assoc _ _ _),
+                 simp,
+                 refine eq.trans (category.id_comp _) _,
+                 refine eq.trans _ (congr_arg _ (category.id_comp _).symm),
+                 change (cokernel.π i
+                         ≫ (coker_functor (homological_complex V c)).map
+                              (arrow.hom_mk w  : arrow.mk i ⟶ arrow.mk j)).f p
+                        = (h ≫ cokernel.π j).f p,
+                 congr' 1,
+                 dsimp [coker_functor],
+                 exact coker_map_spec i j h' h w.symm },
+               rw [this f' f w1, this g' g w2],
+               symmetry, apply is_colimit.uniq'
+                                 (coker_of_chain_map_at_is_colimit i p)
+                                 (cofork.of_π (f.f p ≫ cofork.π (coker_of_chain_map_at j p))
+                                              (H f' f w1)),
+               intro u, cases u; simp,
+               have := congr_arg (λ t, t ≫ cofork.π (coker_of_chain_map_at j p)) (s.comm p),
+               refine eq.trans _ this.symm,
+               simp,
+               delta cofork.π coker_of_chain_map_at parallel_pair_comp.cocone_comp_to_cocone_pair,
+               dsimp,
+               rw [category.assoc, ← d_next_comp_left, category.assoc, ← prev_d_comp_left], 
+               apply congr_arg2; simp only [eq_to_hom_app, eq_to_hom_refl],
+               { refine eq.trans (category.id_comp _) _,
+                 refine eq.trans _ (congr_arg _ (category.id_comp _).symm),
+                 rw ← d_next_comp_right, congr,
+                 ext q r,
+                 rw (_ : (cokernel.π i).f q
+                       = cofork.π (coker_of_chain_map_at i q)),
+                 simp,
+                 exact congr_arg _ (category.id_comp _),
+                 delta cofork.π coker_of_chain_map_at parallel_pair_comp.cocone_comp_to_cocone_pair,
+                 simp, },
+               { refine eq.trans (category.id_comp _) _,
+                 refine eq.trans _ (congr_arg _ (category.id_comp _).symm),
+                 rw ← prev_d_comp_right, congr,
+                 ext q r,
+                 rw (_ : (cokernel.π i).f q
+                       = cofork.π (coker_of_chain_map_at i q)),
+                 simp,
+                 exact congr_arg _ (category.id_comp _),
+                 delta cofork.π coker_of_chain_map_at parallel_pair_comp.cocone_comp_to_cocone_pair,
+                 simp, } } }
 
 end general_abelian_category
 
@@ -149,10 +283,10 @@ end chain_complex
 
 section Modules
 
-universes u u' v v' idx
+universes u u' v v'
 
 parameters {C : Type u} {R : Type v} [category.{u'} C] [comm_ring R]
-parameters {ι : Type idx} {c : complex_shape ι}
+parameters {ι : Type} {c : complex_shape ι}
 
 lemma all_eq_zero_of_iso_zero {M : Module.{v'} R} (H : is_isomorphic M 0) (x : M) : x = 0 :=
   congr_fun (congr_arg coe_fn (id_eq_zero_of_iso_zero M H)) x

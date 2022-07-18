@@ -682,82 +682,161 @@ begin
   refl
 end
 
-lemma singular_homology.homotopy_invariant (R : Type*) [comm_ring R]
-  (n : ℕ) (X Y : Top) (f g : X ⟶ Y) (H : continuous_map.homotopy f g)
-  : (singular_homology R n).map f = (singular_homology R n).map g :=
+lemma inclusion_at_0_nat_trans_app_comp_homotopy (R : Type*) [comm_ring R]
+  {X Y : Top} {f g : X ⟶ Y} (H : continuous_map.homotopy f g)
+  : (whisker_right (inclusion_at_t_nat_trans 0) (singular_chain_complex R)).app X
+    ≫ (singular_chain_complex R).map H.to_continuous_map
+  = (singular_chain_complex R).map f := 
+  eq.trans ((singular_chain_complex R).map_comp ((inclusion_at_t_nat_trans 0).app X)
+                                                H.to_continuous_map).symm
+           (congr_arg (@category_theory.functor.map _ _ _ _ (singular_chain_complex R) X Y)
+                      (continuous_map.ext H.map_zero_left'))
+
+lemma inclusion_at_1_nat_trans_app_comp_homotopy (R : Type*) [comm_ring R]
+  {X Y : Top} {f g : X ⟶ Y} (H : continuous_map.homotopy f g)
+  : (whisker_right (inclusion_at_t_nat_trans 1) (singular_chain_complex R)).app X
+    ≫ (singular_chain_complex R).map H.to_continuous_map
+  = (singular_chain_complex R).map g := 
+  eq.trans ((singular_chain_complex R).map_comp ((inclusion_at_t_nat_trans 1).app X)
+                                                H.to_continuous_map).symm
+           (congr_arg (@category_theory.functor.map _ _ _ _ (singular_chain_complex R) X Y)
+                      (continuous_map.ext H.map_one_left'))
+
+noncomputable 
+def singular_homology.chain_homotopy_of_homotopy (R : Type*) [comm_ring R]
+  {X Y : Top} {f g : X ⟶ Y} (H : continuous_map.homotopy f g)
+  : homotopy ((singular_chain_complex R).map f) ((singular_chain_complex R).map g) :=
+  have h : whisker_right (whisker_right (inclusion_at_t_nat_trans 0) (singular_chain_complex R))
+             (homology_functor (Module R) (complex_shape.down ℕ) 0) =
+           whisker_right (whisker_right (inclusion_at_t_nat_trans 1) (singular_chain_complex R))
+             (homology_functor (Module R) (complex_shape.down ℕ) 0),
+  by { apply functor_basis.homology_ext (singular_chain_complex_basis R 0),
+       intro i, cases i,
+       refine exists.intro (simplex_to_chain _ R) _,
+       { refine ⟨(λ p, (⟨(p.val 0).val, (p.val 0).property, topological_simplex.coord_le_one 1 0 p⟩,
+                         topological_simplex.point)), _⟩,
+         continuity,
+         apply continuous.congr
+                 (continuous.comp (continuous_apply 0 : continuous (λ x : fin 2 → nnreal, x 0))
+                                 continuous_subtype_val),
+         intro x, cases x, simp },
+       dsimp [simplex_to_chain],
+       rw singular_chain_complex_differential_desc_deg_0,
+       rw [inclusion_at_t_nat_trans_on_chain, inclusion_at_t_nat_trans_on_chain],
+       delta simplex_category.to_Top,
+       simp,
+       rw add_sub_left_comm,
+       refine eq.trans (add_zero _).symm _,
+       congr,
+       { ext, simp [simplex_category.to_Top_map],
+         transitivity ↑((∅ : finset (fin 1)).sum (λ i, x.val i)),
+         simp,
+         apply_instance,
+         refl,
+         simp,
+         congr,
+         apply @unique.eq_default _ topological_simplex.point_unique },
+       { symmetry, rw sub_eq_zero, congr,
+         ext : 3, simp [simplex_category.to_Top_map],
+         have : finset.univ.sum x.val = (1 : nnreal) := x.property,
+         rw subtype.ext_iff at this,
+         refine eq.trans this.symm _,
+         congr,
+         simp, 
+         apply @unique.eq_default _ topological_simplex.point_unique } },
+  let s := (lift_nat_trans_unique
+             (singular_chain_complex_basis R)
+             (cylinder ⋙ singular_chain_complex R)
+             (λ n hn, 
+               have H : ∀ k, contractible_space (unit_interval × topological_simplex k),
+               by { intro k, apply prod_of_contractible_contractible,
+                     { apply convex.contractible_space,
+                       apply @convex_Icc ℝ ℝ _ _ _ _ 0 1,
+                       existsi (0 : ℝ), simp },
+                     { rw homeomorph.contractible_space_iff (topological_simplex_alt_desc k),
+                       apply convex.contractible_space,
+                       { intros x y hx hy s t hs ht hsum,
+                         split,
+                         { intro i, rw [pi.add_apply, pi.smul_apply, pi.smul_apply],
+                           have hxi := hx.left i, have hyi := hy.left i,
+                           apply @convex_Ici ℝ ℝ _ _ _ _ 0; assumption },
+                         { rw ← hsum,
+                           transitivity (s • (finset.univ.sum x)) + (t • (finset.univ.sum y)),
+                           rw [finset.smul_sum, finset.smul_sum, ← finset.sum_add_distrib],
+                           congr, 
+                           rw [hx.right, hy.right],
+                           simp } },
+                       { existsi (topological_simplex_alt_desc k (vertex k 1)).val,
+                         exact (topological_simplex_alt_desc k (vertex k 1)).property } } },
+               let H' (k : ℕ) (hk : k > 0) (i : (singular_chain_complex_basis R k).indices) :=
+                 homology_of_contractible_space R (Top.of (unit_interval × topological_simplex k))
+                                                 (H k) n hn
+               in ⟨H' n hn, H' (n + 1) (nat.zero_lt_succ n)⟩)
+             (whisker_right (inclusion_at_t_nat_trans 0) (singular_chain_complex R))
+             (whisker_right (inclusion_at_t_nat_trans 1) (singular_chain_complex R))
+             h).to_chain_htpy X,
+      s' := s.comp_right ((singular_chain_complex R).map H.to_continuous_map)
+  in ((homotopy.of_eq (inclusion_at_0_nat_trans_app_comp_homotopy R H).symm).trans s').trans
+        (homotopy.of_eq (inclusion_at_1_nat_trans_app_comp_homotopy R H))
+
+lemma singular_homology.chain_homotopy_of_homotopy_natural (R : Type*) [comm_ring R]
+  {A X B Y : Top} (i : A ⟶ X) (j : B ⟶ Y)
+  (f' g' : A ⟶ B) (f g : X ⟶ Y)
+  (w1 : f' ≫ j = i ≫ f) (w2 : g' ≫ j = i ≫ g)
+  (H' : continuous_map.homotopy f' g') (H : continuous_map.homotopy f g)
+  (h : cylinder.map i ≫ H.to_continuous_map = H'.to_continuous_map ≫ j)
+  : homotopy.comp_right (singular_homology.chain_homotopy_of_homotopy R H')
+                        ((singular_chain_complex R).map j)
+  = (homotopy.of_eq (eq.trans ((singular_chain_complex R).map_comp f' j).symm
+                                (eq.trans (congr_arg _ w1)
+                                          ((singular_chain_complex R).map_comp i f)))).trans
+      ((homotopy.comp_left (singular_homology.chain_homotopy_of_homotopy R H)
+                           ((singular_chain_complex R).map i)).trans
+        (homotopy.of_eq (eq.trans ((singular_chain_complex R).map_comp i g).symm 
+                                  (eq.trans (congr_arg _ w2.symm)
+                                            ((singular_chain_complex R).map_comp g' j))))) :=
 begin
-    have :=
-    lifts_of_nat_trans_H0_give_same_map_in_homology
-      (singular_chain_complex_basis R)
-      (cylinder ⋙ singular_chain_complex R)
-      (λ n hn, 
-        have H : ∀ k, contractible_space (unit_interval × topological_simplex k),
-        by { intro k, apply prod_of_contractible_contractible,
-             { apply convex.contractible_space,
-               apply @convex_Icc ℝ ℝ _ _ _ _ 0 1,
-               existsi (0 : ℝ), simp },
-             { rw homeomorph.contractible_space_iff (topological_simplex_alt_desc k),
-               apply convex.contractible_space,
-               { intros x y hx hy s t hs ht hsum,
-                 split,
-                 { intro i, rw [pi.add_apply, pi.smul_apply, pi.smul_apply],
-                   have hxi := hx.left i, have hyi := hy.left i,
-                   apply @convex_Ici ℝ ℝ _ _ _ _ 0; assumption },
-                 { rw ← hsum,
-                   transitivity (s • (finset.univ.sum x)) + (t • (finset.univ.sum y)),
-                   rw [finset.smul_sum, finset.smul_sum, ← finset.sum_add_distrib],
-                   congr, 
-                   rw [hx.right, hy.right],
-                   simp } },
-               { existsi (topological_simplex_alt_desc k (vertex k 1)).val,
-                 exact (topological_simplex_alt_desc k (vertex k 1)).property } } },
-        let H' (k : ℕ) (hk : k > 0) (i : (singular_chain_complex_basis R k).indices) :=
-          homology_of_contractible_space R (Top.of (unit_interval × topological_simplex k))
-                                         (H k) n hn
-        in ⟨H' n hn, H' (n + 1) (nat.zero_lt_succ n)⟩)
-    (whisker_right (inclusion_at_t_nat_trans 0) (singular_chain_complex R))
-    (whisker_right (inclusion_at_t_nat_trans 1) (singular_chain_complex R)) _ n X,
-    rw (_ : f = (inclusion_at_t_nat_trans 0).app _ ≫ H.to_continuous_map),
-    swap, { ext, symmetry, apply H.map_zero_left' },
-    transitivity (singular_homology R n).map ((inclusion_at_t_nat_trans 1).app _ ≫ H.to_continuous_map),
-    swap, { congr, ext, apply H.map_one_left' },
-    have := congr_arg (λ f, f ≫ @category_theory.functor.map _ _ _ _ (singular_homology R n) (Top.of (unit_interval × X)) (Top.of Y) (H.to_continuous_map)) this,
-    refine eq.trans _ (eq.trans this _);
-    rw (singular_homology R n).map_comp'; refl,
-    apply functor_basis.homology_ext (singular_chain_complex_basis R 0),
-    intro i, cases i,
-    refine exists.intro (simplex_to_chain _ R) _,
-    { refine ⟨(λ p, (⟨(p.val 0).val, (p.val 0).property, topological_simplex.coord_le_one 1 0 p⟩,
-                      topological_simplex.point)), _⟩,
-      continuity,
-      apply continuous.congr
-              (continuous.comp (continuous_apply 0 : continuous (λ x : fin 2 → nnreal, x 0))
-                               continuous_subtype_val),
-      intro x, cases x, simp },
-    dsimp [simplex_to_chain],
-    rw singular_chain_complex_differential_desc_deg_0,
-    rw [inclusion_at_t_nat_trans_on_chain, inclusion_at_t_nat_trans_on_chain],
-    delta simplex_category.to_Top,
-    simp,
-    rw add_sub_left_comm,
-    refine eq.trans (add_zero _).symm _,
-    congr,
-    { ext, simp [simplex_category.to_Top_map],
-      transitivity ↑((∅ : finset (fin 1)).sum (λ i, x.val i)),
-      simp,
-      apply_instance,
-      refl,
-      simp,
-      congr,
-      apply @unique.eq_default _ topological_simplex.point_unique },
-    { symmetry, rw sub_eq_zero, congr,
-      ext : 3, simp [simplex_category.to_Top_map],
-      have : finset.univ.sum x.val = (1 : nnreal) := x.property,
-      rw subtype.ext_iff at this,
-      refine eq.trans this.symm _,
-      congr,
-      simp, 
-      apply @unique.eq_default _ topological_simplex.point_unique }
+  ext p q : 3, simp [singular_homology.chain_homotopy_of_homotopy],
+  by_cases h' : p + 1 = q,
+  { rw [← homological_complex.comp_f, ← category_theory.functor.map_comp],
+    rw ← h,
+    rw [category_theory.functor.map_comp, homological_complex.comp_f, ← category.assoc,
+        ← category_theory.functor.comp_map],
+    rw ← (lift_nat_trans_unique (singular_chain_complex_basis R)
+                                (cylinder ⋙ singular_chain_complex R) _ _ _ _).naturality,
+    apply category.assoc,
+    exact h' },
+  { rw ← complex_shape.down_rel _ q p at h', rw [homotopy.zero _ _ _ h', homotopy.zero _ _ _ h'],
+    simp }
 end
+
+lemma singular_homology.homotopy_invariant (R : Type*) [comm_ring R]
+  (n : ℕ) {X Y : Top} {f g : X ⟶ Y} (H : continuous_map.homotopy f g)
+  : (singular_homology R n).map f = (singular_homology R n).map g :=
+  homology_map_eq_of_homotopy (singular_homology.chain_homotopy_of_homotopy R H) n
+
+lemma singular_homology_of_pair.homotopy_invariant (R : Type*) [comm_ring R]
+  (n : ℕ) (A X B Y : Top) (i : A ⟶ X) (j : B ⟶ Y)
+  (f' g' : A ⟶ B) (f g : X ⟶ Y)
+  (w1 : f' ≫ j = i ≫ f) (w2 : g' ≫ j = i ≫ g)
+  (H' : continuous_map.homotopy f' g') (H : continuous_map.homotopy f g)
+  (h : cylinder.map i ≫ H.to_continuous_map = H'.to_continuous_map ≫ j)
+  : (singular_homology_of_pair R n).map (arrow.hom_mk w1 : arrow.mk i ⟶ arrow.mk j)
+  = (singular_homology_of_pair R n).map (arrow.hom_mk w2 : arrow.mk i ⟶ arrow.mk j) :=
+  homology_map_eq_of_homotopy
+    (chain_homotopy_on_coker_of_compatible_chain_homotopies 
+      ((singular_chain_complex R).map i) ((singular_chain_complex R).map j)
+      ((singular_chain_complex R).map f') ((singular_chain_complex R).map g')
+      ((singular_chain_complex R).map f) ((singular_chain_complex R).map g)
+      (eq.trans ((singular_chain_complex R).map_comp f' j).symm
+                (eq.trans (congr_arg _ w1) 
+                          ((singular_chain_complex R).map_comp i f)))
+      (eq.trans ((singular_chain_complex R).map_comp g' j).symm
+                (eq.trans (congr_arg _ w2) 
+                          ((singular_chain_complex R).map_comp i g)))
+      (singular_homology.chain_homotopy_of_homotopy R H')
+      (singular_homology.chain_homotopy_of_homotopy R H)
+      (singular_homology.chain_homotopy_of_homotopy_natural R i j f' g' f g w1 w2 H' H h))
+    n
 
 end
