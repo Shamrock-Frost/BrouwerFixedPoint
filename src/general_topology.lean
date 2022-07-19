@@ -2,7 +2,6 @@ import topology.constructions
 import topology.separation
 import topology.category.Top.basic
 import topology.homotopy.basic
-import analysis.convex.basic 
 import analysis.convex.star
 
 lemma quotient_map_of_is_closed_map {α β} [topological_space α] [topological_space β] 

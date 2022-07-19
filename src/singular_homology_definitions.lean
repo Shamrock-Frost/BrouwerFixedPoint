@@ -20,7 +20,7 @@ def free_complex_on_sset (R : Type*) [comm_ring R] : sSet ⥤ chain_complex (Mod
 
 noncomputable
 def singular_chain_complex (R : Type*) [comm_ring R] : Top ⥤ chain_complex (Module R) ℕ :=
-  Top.to_sSet ⋙ free_complex_on_sset R
+  Top.to_sSet' ⋙ free_complex_on_sset R
 
 noncomputable
 def singular_chain_complex_of_pair (R : Type*) [comm_ring R]
@@ -38,7 +38,7 @@ def singular_homology_of_pair (R : Type*) [comm_ring R] (n : ℕ) : arrow Top �
 
 noncomputable
 def singular_zero_simplex_of_pt {X : Top} (x0 : X)
-  : (Top.to_sSet.obj X).obj (opposite.op (simplex_category.mk 0)) := 
+  : (Top.to_sSet'.obj X).obj (opposite.op (simplex_category.mk 0)) := 
   (continuous_map.const (topological_simplex 0) x0)
 
 noncomputable
@@ -47,15 +47,22 @@ def simplex_to_chain {n : ℕ} {X : sSet}
   (R : Type*) [comm_ring R] : ((free_complex_on_sset R).obj X).X n :=
   finsupp.single σ 1
 
+-- Should mark this as simp and use it more widely maybe?
+lemma singular_chain_complex_map
+  (R : Type*) [comm_ring R] (n : ℕ) {X Y : Top} 
+  (f : X ⟶ Y) (σ : (Top.to_sSet'.obj X).obj (opposite.op (simplex_category.mk n)))
+  : ((singular_chain_complex R).map f).f n (finsupp.single σ 1) 
+  = finsupp.single (σ ≫ f) 1 := finsupp.map_domain_single
+
 lemma singular_chain_complex_differential_desc (R : Type*) [comm_ring R] {X : Top} {n : ℕ}
-  (σ : topological_simplex (n + 1) ⟶ X)
+  (σ : Top.of (topological_simplex (n + 1)) ⟶ X)
   : ((singular_chain_complex R).obj X).d (n + 1) n (finsupp.single σ 1)
   = ∑ (i : fin (n + 2)), (-1 : ℤ)^(i : ℕ)
-  • simplex_to_chain (simplex_category.to_Top.map (simplex_category.δ i) ≫ σ) R := by {
+  • simplex_to_chain (simplex_category.to_Top'.map (simplex_category.δ i) ≫ σ) R := by {
     dsimp [singular_chain_complex, free_complex_on_sset],
     transitivity (alternating_face_map_complex.obj_d
                      (((simplicial_object.whiskering Type (Module R)).obj (Module.free R)).obj
-                                                                         (Top.to_sSet.obj X)) n)
+                                                                          (Top.to_sSet'.obj X)) n)
                      .to_fun
                      (finsupp.single σ 1),
     { congr, apply chain_complex.of_d },
@@ -66,20 +73,20 @@ lemma singular_chain_complex_differential_desc (R : Type*) [comm_ring R] {X : To
       { intros t h,
         rw finset.mem_singleton,
         simp at h,
-        have : ((Module.free R).map ((Top.to_sSet.obj X).δ i) (finsupp.single σ 1)).to_fun t ≠ 0 := h,
+        have : ((Module.free R).map ((Top.to_sSet'.obj X).δ i) (finsupp.single σ 1)).to_fun t ≠ 0 := h,
         simp at this,
         exact and.left (finsupp.single_apply_ne_zero.mp this) },
-      { change (((Module.free R).map ((Top.to_sSet.obj X).δ i) (finsupp.single σ 1)).to_fun
-                  (simplex_category.to_Top.map (simplex_category.δ i) ≫ σ) = 1),
+      { change (((Module.free R).map ((Top.to_sSet'.obj X).δ i) (finsupp.single σ 1)).to_fun
+                  (simplex_category.to_Top'.map (simplex_category.δ i) ≫ σ) = 1),
         simp,
         exact finsupp.single_eq_same } }
   }
 
 lemma singular_chain_complex_differential_desc_deg_0 (R : Type*) [comm_ring R] {X : Top}
-  (σ : topological_simplex 1 ⟶ X)
+  (σ : Top.of (topological_simplex 1) ⟶ X)
   : ((singular_chain_complex R).obj X).d 1 0 (finsupp.single σ 1)
-  = simplex_to_chain (simplex_category.to_Top.map (@simplex_category.δ 0 0) ≫ σ) R 
-  - simplex_to_chain (simplex_category.to_Top.map (@simplex_category.δ 0 1) ≫ σ) R :=
+  = simplex_to_chain (simplex_category.to_Top'.map (@simplex_category.δ 0 0) ≫ σ) R 
+  - simplex_to_chain (simplex_category.to_Top'.map (@simplex_category.δ 0 1) ≫ σ) R :=
 begin
   rw singular_chain_complex_differential_desc,
   rw finset.sum_eq_add_of_mem (0 : fin 2) 1 (finset.mem_univ _) (finset.mem_univ _),

@@ -1,19 +1,94 @@
 import algebraic_topology.simplex_category
-import algebraic_topology.topological_simplex
+import algebraic_topology.simplicial_object
 import analysis.convex.basic
+import algebraic_topology.simplicial_set
 
 local attribute [instance]
   category_theory.concrete_category.has_coe_to_sort
   category_theory.concrete_category.has_coe_to_fun
 
-def simplex_category.squash (n : ℕ) : simplex_category.mk n ⟶ simplex_category.mk 0 :=
+noncomputable theory
+
+namespace simplex_category
+
+def squash (n : ℕ) : simplex_category.mk n ⟶ simplex_category.mk 0 :=
   simplex_category.mk_hom ⟨(λ _, 0), by { intros x y _, reflexivity }⟩
 
-noncomputable
-def topological_simplex (n : ℕ) := simplex_category.to_Top.obj (simplex_category.mk n)
+def to_Top'_obj (x : simplex_category) := std_simplex ℝ x
+
+open_locale simplicial big_operators classical
+
+instance (x : simplex_category) : has_coe_to_fun x.to_Top'_obj (λ _, x → ℝ) :=
+⟨λ f, (f : x → ℝ)⟩
+
+lemma to_Top'_obj_coord_sum_nonzero {x : simplex_category} {s : finset x}
+  (p : x.to_Top'_obj) : 0 ≤ ∑ i in s, p i := 
+  le_of_eq_of_le (finset.sum_eq_zero (λ _ _, rfl)).symm
+                 (finset.sum_le_sum (λ i _, p.property.left i))
+
+@[ext]
+lemma to_Top'_obj.ext {x : simplex_category} (f g : x.to_Top'_obj) :
+  (f : x → ℝ) = g → f = g := subtype.ext
+
+-- Should be defined in analysis.convex.basic, maybe?
+def to_Top'_map {x y : simplex_category} (f : x ⟶ y)
+  : x.to_Top'_obj → y.to_Top'_obj :=
+    λ p, ⟨λ i, ∑ j in (finset.univ.filter (λ k, f k = i)), p j,
+          λ i, to_Top'_obj_coord_sum_nonzero p,
+          by { refine eq.trans _ p.2.right,
+                refine eq.trans (finset.sum_bUnion _).symm _,
+                { refine finset.pairwise_disjoint_coe.mp _,
+                  convert set.pairwise_disjoint_fiber f _,
+                  ext, simp },
+                { apply finset.sum_congr,
+                  { rw finset.eq_univ_iff_forall,
+                    intro i,
+                    rw finset.mem_bUnion,
+                    exact ⟨f i, by simp, by simp⟩ },
+                  { intros, refl } } }⟩
+
+@[simp]
+lemma coe_to_Top'_map {x y : simplex_category} (f : x ⟶ y) (g : x.to_Top'_obj) (i : y) :
+  to_Top'_map f g i = ∑ j in (finset.univ.filter (λ k, f k = i)), g j := rfl
+
+@[continuity]
+lemma continuous_to_Top'_map {x y : simplex_category} (f : x ⟶ y) :
+  continuous (to_Top'_map f) :=
+continuous_subtype_mk _ $ continuous_pi $ λ i, continuous_finset_sum _ $
+  λ j hj, continuous.comp (continuous_apply _) continuous_subtype_val
+
+@[simps]
+def to_Top' : simplex_category ⥤ Top :=
+{ obj := λ x, Top.of x.to_Top'_obj,
+  map := λ x y f, ⟨to_Top'_map f⟩,
+  map_id' := begin
+    intros x,
+    ext f i : 3,
+    change (finset.univ.filter (λ k, k = i)).sum _ = _,
+    simp [finset.sum_filter]
+  end,
+  map_comp' := begin
+    intros x y z f g,
+    ext h i : 3,
+    dsimp,
+    erw ← finset.sum_bUnion,
+    apply finset.sum_congr,
+    { exact finset.ext (λ j, ⟨λ hj, by simpa using hj, λ hj, by simpa using hj⟩) },
+    { tauto },
+    { refine finset.pairwise_disjoint_coe.mp _,
+      convert set.pairwise_disjoint_fiber f _,
+      ext, simp },
+  end }
+
+end simplex_category
+
+def Top.to_sSet' : Top ⥤ sSet :=
+category_theory.colimit_adj.restricted_yoneda simplex_category.to_Top'
+
+def topological_simplex (n : ℕ) := simplex_category.to_Top'_obj (simplex_category.mk n)
 
 def topological_simplex.point : topological_simplex 0 := ⟨(λ _, 1), by {
-  dsimp [simplex_category.to_Top_obj],
+  split, { intro, exact zero_le_one },
   apply finset.sum_eq_single_of_mem,
   exact finset.mem_univ 0,
   intros b h h', cases b with b bh, 
@@ -25,70 +100,27 @@ instance topological_simplex.point_unique : unique (topological_simplex 0) := {
   default := topological_simplex.point,
   uniq := by {
     suffices : ∀ x : topological_simplex 0, x.val 0 = 1,
-    { intro, apply subtype.eq, funext x,
+    { intro, ext x,
       cases x with k hk, simp at hk, subst hk,
-      transitivity (1 : nnreal), 
-      { rw ← this, refl },
-      { rw ← this, refl } },
-    intro x, cases x with f h,
-    dsimp [simplex_category.to_Top_obj] at h,
-    rw ← h,
-    dsimp [subtype.val],
-    symmetry,
-    apply finset.sum_eq_single_of_mem, apply finset.mem_univ,
-    intros b hb H,
-    cases b with b h', exfalso, apply H, apply subtype.eq,
-    simp at ⊢ h', assumption
-  }
-}
-
--- Should probably use this in more places?
-noncomputable
-def topological_simplex_alt (n : ℕ) := Top.of (std_simplex ℝ (fin (n + 1)))
-
-def topological_simplex_alt_desc (n : ℕ) : topological_simplex n ≃ₜ topological_simplex_alt n := {
-  to_fun := λ x, ⟨λ i, (x.val i).val, λ i, (x.val i).property,
-                    by { have := (congr_arg subtype.val x.property),
-                        refine eq.trans _ this,
-                        symmetry, 
-                        simp at this,
-                        have := map_sum (⟨subtype.val, _, _⟩ : nnreal →+ ℝ) x.val finset.univ,
-                        swap, { refl }, swap, { rintros ⟨x, _⟩ ⟨y, _⟩, simp },
-                        refine eq.trans this _,
-                        congr }⟩,
-  inv_fun := λ x, ⟨λ i, ⟨x.val i, x.property.left i⟩,
-                     by { refine subtype.eq _,
-                         have := x.property.right,
-                         refine eq.trans _ this,
-                         let f : fin (n + 1) → nnreal := λ i, ⟨x.val i, x.property.left i⟩,
-                         have := map_sum (⟨subtype.val, _, _⟩ : nnreal →+ ℝ) f finset.univ,
-                         swap, { refl }, swap, { rintros ⟨x, _⟩ ⟨y, _⟩, simp },
-                         refine eq.trans this _,
-                         congr }⟩,
-  left_inv := λ x, by simp,
-  right_inv := λ x, by simp,
-  continuous_to_fun := by { simp, continuity,
-                            apply continuous.congr ((continuous_apply i).comp continuous_subtype_coe), 
-                            simp },
-  continuous_inv_fun := by { simp, continuity,
-                             apply continuous.congr ((continuous_apply i).comp continuous_subtype_coe), 
-                             simp }
+      exact eq.trans (this a) (this topological_simplex.point).symm },
+    rintro ⟨f, h⟩,
+    exact eq.trans finset.sum_singleton.symm h.right }
 }
 
 noncomputable
-def inclusion (n : ℕ) : topological_simplex n ⟶ topological_simplex (n + 1) := 
-  simplex_category.to_Top.map (simplex_category.δ 0)
+def inclusion (n : ℕ) : Top.of (topological_simplex n) ⟶ Top.of (topological_simplex (n + 1)) := 
+  simplex_category.to_Top'.map (simplex_category.δ 0)
 
 noncomputable
 def const_vertex (n : ℕ) (i : simplex_category.mk (n + 1))
-  : topological_simplex n ⟶ topological_simplex (n + 1) :=
-  simplex_category.to_Top.map (simplex_category.squash n
-                                ≫ simplex_category.const (simplex_category.mk (n+1)) i)
+  : Top.of (topological_simplex n) ⟶ Top.of (topological_simplex (n + 1)) :=
+  simplex_category.to_Top'.map (simplex_category.squash n
+                               ≫ simplex_category.const (simplex_category.mk (n+1)) i)
 
 noncomputable
 def vertex (n : ℕ) (i : simplex_category.mk n) : topological_simplex n 
-  := simplex_category.to_Top.map (simplex_category.const (simplex_category.mk n) i)
-                                 topological_simplex.point
+  := simplex_category.to_Top'.map (simplex_category.const (simplex_category.mk n) i)
+                                  topological_simplex.point
 
 lemma topological_simplex.coord_le_one (n : ℕ) (i : simplex_category.mk n)
   (x : topological_simplex n) : x.val i ≤ 1 :=
@@ -96,8 +128,10 @@ begin
   transitivity (finset.univ.sum x.val),
   { rw ← finset.insert_erase (finset.mem_univ i),
     rw finset.sum_insert (finset.not_mem_erase _ _),
-    exact le_self_add },
-  { exact le_of_eq x.property }
+    refine le_of_eq_of_le (add_zero _).symm _,
+    apply add_le_add, refl,
+    apply simplex_category.to_Top'_obj_coord_sum_nonzero },
+  { exact le_of_eq x.property.right }
 end
 
 lemma topological_simplex.has_one_implies_eq_zero (n : ℕ) (i : simplex_category.mk n)
@@ -105,8 +139,7 @@ lemma topological_simplex.has_one_implies_eq_zero (n : ℕ) (i : simplex_categor
 begin
   intros j hij,
   have : finset.sum (insert i (insert j (finset.erase (finset.erase finset.univ i) j))) x.val = 1,
-  { have := x.property, dsimp [simplex_category.to_Top_obj] at this, 
-    rw ← this, congr, rw [finset.insert_erase, finset.insert_erase],
+  { rw ← x.property.right, congr, rw [finset.insert_erase, finset.insert_erase],
     apply finset.mem_univ,
     apply finset.mem_erase_of_ne_of_mem,
     symmetry, assumption,
@@ -114,30 +147,26 @@ begin
   rw [finset.sum_insert, finset.sum_insert] at this,
   { rw h at this,
     rw add_right_eq_self at this,
-    rw ← @real.to_nnreal_coe (x.val j),
-    apply real.to_nnreal_of_nonpos,
-    rw ← real.le_to_nnreal_iff_coe_le,
-    transitivity (0 : nnreal), rw ← this,
-    apply le_add_of_nonneg_right,
-    simp, simp },
+    refine le_antisymm _ (x.property.left j),
+    refine le_of_le_of_eq _ this,
+    refine le_add_of_nonneg_right _,
+    apply simplex_category.to_Top'_obj_coord_sum_nonzero },
   simp, simp, assumption
 end
 
 lemma vertex_coord_one (n : ℕ) (i : simplex_category.mk n) : 
-  @coe_fn _ _ (simplex_category.to_Top_obj.has_coe_to_fun (simplex_category.mk n))
+  @coe_fn _ _ (simplex_category.to_Top'_obj.has_coe_to_fun (simplex_category.mk n))
               (vertex n i) i = 1 := 
 begin
   simp [vertex],
-  transitivity finset.univ.sum (λ _, (1 : nnreal)),
+  transitivity finset.univ.sum (λ _, (1 : ℝ)),
   congr, 
-  { apply finset.eq_univ_of_forall,
-    intro x, simp, refl },
-  { apply_instance },
+  { refine finset.eq_univ_of_forall _, intro x, simp, refl },
   { norm_num }
 end
 
 lemma vertex_coord_zero (n : ℕ) (i j : simplex_category.mk n) (h : i ≠ j) :
-  @coe_fn _ _ (simplex_category.to_Top_obj.has_coe_to_fun (simplex_category.mk n))
+  @coe_fn _ _ (simplex_category.to_Top'_obj.has_coe_to_fun (simplex_category.mk n))
               (vertex n i) j = 0 :=
 topological_simplex.has_one_implies_eq_zero n i _ (vertex_coord_one n i) j h
 
@@ -148,7 +177,7 @@ begin
   ext k,
   by_cases (i = k),
   { subst h, rw vertex_coord_one, rw ← hi, refl },
-  { rw vertex_coord_zero n _ _ h, congr,
+  { rw vertex_coord_zero n _ _ h,
     exact topological_simplex.has_one_implies_eq_zero n i x hi _ h }
 end
 
@@ -157,13 +186,13 @@ lemma const_desc (n : ℕ) (i : simplex_category.mk (n + 1)) (x : topological_si
 begin
   delta const_vertex,
   delta vertex,
-  rw simplex_category.to_Top.map_comp,
+  rw simplex_category.to_Top'.map_comp,
   simp, congr,
   apply @unique.eq_default _ topological_simplex.point_unique
 end
 
 lemma deg_zero_zeroth_coface_map_is_vertex_one 
-  : simplex_category.to_Top_map (simplex_category.δ 0) topological_simplex.point
+  : simplex_category.to_Top'_map (simplex_category.δ 0) topological_simplex.point
   = vertex 1 1 :=
 by {
   transitivity const_vertex 0 1 topological_simplex.point,
@@ -173,7 +202,7 @@ by {
 }
 
 lemma deg_zero_oneth_coface_map_is_vertex_zero
-  : simplex_category.to_Top_map (simplex_category.δ 1) topological_simplex.point
+  : simplex_category.to_Top'_map (simplex_category.δ 1) topological_simplex.point
   = vertex 1 0 :=
 by {
   transitivity const_vertex 0 0 topological_simplex.point,
@@ -244,4 +273,3 @@ lemma sum_over_n_simplices_eq {G} [add_comm_monoid  G] (n : ℕ) (f : simplex_ca
                  (λ j h, by { dsimp,
                               simp at h,
                               exact succ_sigma_of_nonzero n j h })
-
