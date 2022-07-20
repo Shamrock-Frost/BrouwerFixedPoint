@@ -13,6 +13,7 @@ import topology.algebra.group_with_zero
 import topology.category.CompHaus.default
 import topology.homotopy.product topology.homotopy.contractible
 import analysis.convex.contractible
+import analysis.convex.topology
 import data.opposite data.finset.pointwise
 import .simplices .instances .general_topology .homological_algebra .linear_algebra 
 import .acyclic_models_theorem .singular_homology_definitions
@@ -218,7 +219,9 @@ lemma q_quot (n : ℕ) : quotient_map (function.uncurry (q_map n)) :=
 begin
   -- why doesn't this get found by typeclass instance resolution :(
   have : compact_space (I × topological_simplex n),
-  { dsimp [topological_simplex, simplex_category.to_Top'_obj], apply_instance },
+  { change compact_space (I × std_simplex ℝ (fin (n + 1))),
+    refine @prod.compact_space I (std_simplex ℝ (fin (n + 1))) _ _ _
+                               (is_compact_iff_compact_space.mp (compact_std_simplex (fin (n + 1)))) },
   apply @surjection_of_compact_hausdorff_is_quot_map _ _ _ _ this,
   apply q_surj,
   apply q_continuous
