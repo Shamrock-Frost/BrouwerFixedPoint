@@ -383,6 +383,27 @@ def cone_construction_hom (R : Type*) [comm_ring R] {X : Top} (x0 : X)
   : ((singular_chain_complex R).obj X).X i ⟶ ((singular_chain_complex R).obj X).X (i + 1) :=
   (Module.free R).map (cone_construction_lift_simplex x0 H i)
 
+lemma cone_construction_hom_naturality (R : Type*) [comm_ring R] {X Y : Top} (x0 : X) (y0 :Y)
+  (f : X ⟶ Y)
+  (H  : continuous_map.homotopy (continuous_map.id X) (continuous_map.const X x0))
+  (H' : continuous_map.homotopy (continuous_map.id Y) (continuous_map.const Y y0)) (i : ℕ)
+  (hf : cylinder.map f ≫ H'.to_continuous_map = H.to_continuous_map ≫ f)
+  : cone_construction_hom R x0 H i ≫ ((singular_chain_complex R).map f).f (i + 1)
+  = ((singular_chain_complex R).map f).f i ≫ cone_construction_hom R y0 H' i :=
+begin
+  delta singular_chain_complex free_complex_on_sset,
+  simp [cone_construction_hom],
+  refine eq.trans (finsupp.lmap_domain_comp R R _ _).symm
+          (eq.trans _ (finsupp.lmap_domain_comp R R _ _)),
+  apply congr_arg,
+  ext σ : 1,
+  symmetry, dsimp [Top.to_sSet'],
+  dsimp [cone_construction_lift_simplex],
+  rw lift_along_quot_map_comm_square,
+  congr' 1,
+  rw [category.assoc, ← hf], simp
+end
+
 noncomputable
 def cone_construction_complex_hom (R : Type*) [comm_ring R] {X : Top} (x0 : X)
   (H : continuous_map.homotopy (continuous_map.id X) (continuous_map.const X x0))
@@ -617,6 +638,16 @@ def singular_chain_complex_basis (R : Type*) [comm_ring R]
                                    transitivity, apply finsupp.map_domain_single, 
                                    congr, ext, refl } },
                                  apply free_module_basis_spanning } }
+
+lemma simplex_to_chain_is_basis (R : Type*) [comm_ring R] (n : ℕ) (X : Top)
+  (σ : Top.of (topological_simplex n) ⟶ X)
+  : @simplex_to_chain n (Top.to_sSet'.obj X) σ R _
+  = ((singular_chain_complex_basis R n).get_basis X) ⟨(), σ⟩ :=
+begin
+  intros, dsimp [functor_basis.get_basis, simplex_to_chain], rw basis.mk_apply,
+  symmetry, refine eq.trans finsupp.map_domain_single _,
+  congr, apply category.id_comp
+end
 
 lemma prod_of_contractible_contractible (X Y : Type*) [topological_space X] [topological_space Y]
   (hX : contractible_space X) (hY : contractible_space Y) : contractible_space (X × Y) := 

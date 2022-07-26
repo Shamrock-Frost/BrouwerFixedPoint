@@ -3,12 +3,11 @@ import algebra.category.Module.images
 import algebra.homology.homology
 import algebra.homology.Module
 import algebra.homology.homotopy
+import algebra.homology.quasi_iso
 
 import for_mathlib.homological_complex_abelian
 
 import .category_theory .linear_algebra
-
-section 
 
 open category_theory category_theory.limits homological_complex
 
@@ -85,7 +84,9 @@ structure natural_chain_homotopy [preadditive V]
 (naturality : ∀ X Y (f : X ⟶ Y) i j, c.rel i j → (F.map f).f j ≫ (to_chain_htpy Y).hom j i
                                                 = (to_chain_htpy X).hom j i ≫ (G.map f).f i)
 
-
+-- This is why we run into universe issues and need ι : Type
+-- parallel_pair_comp is an equality between two functors
+-- and that constrains them to be in the same universe
 protected def parallel_pair_comp_has_colim 
   {V : Type*} [category V] {ι : Type} {c : complex_shape ι}
   [has_zero_morphisms V] [has_cokernels V]
@@ -329,7 +330,7 @@ lemma Module.to_cycles_is_iso (C : homological_complex (Module.{v'} R) c) (i : �
   by { rw Module.to_cycles_def, apply is_iso.of_iso_inv }
 
 lemma Module.to_homology_comp_homology_functor_map
-  {X Y : homological_complex (Module R) c} (f : X ⟶ Y) (i : ι)
+  {X Y : homological_complex (Module.{v'} R) c} (f : X ⟶ Y) (i : ι)
   : Module.as_hom_right (@is_linear_map.mk' R (linear_map.ker (X.d_from i)) (X.homology i)
                                             _ _ _ _ _ 
                                             Module.to_homology
@@ -417,18 +418,6 @@ lemma Module.to_homology_ext
             { intro, simp, rw X.shape' i j h, refl },
             rw this,
             simp } })
-
-lemma Module.to_homology_eq_zero
-  {X : homological_complex (Module.{v'} R) c}
-  {i j : ι} (hij : c.rel i j)
-  {x : linear_map.ker (X.d_from j)}
-  : x.val ∈ linear_map.range (X.d i j) → Module.to_homology x = 0 :=
-begin
-  rintro ⟨w, h⟩,
-  transitivity Module.to_homology (0 : linear_map.ker (X.d_from j)),
-  apply Module.to_homology_ext w, symmetry, simp, exact h,
-  apply (Module.to_homology.homomorphism _ _).map_zero
-end
 
 lemma Module.homology_ext''
   (C D : homological_complex (Module.{v'} R) c)
@@ -543,6 +532,407 @@ def homological_complex.preim_of_homology_class_spec
       Module.to_homology ⟨homological_complex.preim_of_homology_class C y, h⟩ = y :=
   classical.some_spec (homological_complex.exists_preim_homology_class C y)
 
+lemma Module.to_homology_eq_zero
+  {X : homological_complex (Module.{v'} R) c}
+  {i j : ι} (hij : c.rel i j)
+  {x : linear_map.ker (X.d_from j)}
+  : x.val ∈ linear_map.range (X.d i j) ↔ Module.to_homology x = 0 :=
+begin
+  split,
+  { rintro ⟨w, h⟩,
+    transitivity Module.to_homology (0 : linear_map.ker (X.d_from j)),
+    apply Module.to_homology_ext w, symmetry, simp, exact h,
+    apply (Module.to_homology.homomorphism _ _).map_zero },
+  { intro h, cases x with x hx,
+    obtain ⟨y, hy⟩ := homological_complex.exists_preim_cycle_of_to_homology_zero X hij x hx h,
+    exact ⟨y, hy⟩ }
+end
+
+lemma Module.to_homology_eq_zero'
+  {X : homological_complex (Module.{v'} R) c}
+  {i : ι} (hi : c.prev i = none)
+  {x : linear_map.ker (X.d_from i)}
+  : x = 0 ↔ Module.to_homology x = 0 :=
+begin
+  split,
+  { intro h, subst h, exact is_linear_map.map_zero (Module.to_homology.homomorphism X i) },
+  { intro h, delta Module.to_homology at h,
+    suffices : Module.to_cycles x = 0,
+    { delta Module.to_cycles Module.to_kernel_subobject at this,
+      convert congr_arg (kernel_subobject_iso (X.d_from i) ≪≫ Module.kernel_iso_ker (X.d_from i)).hom this;
+      simp },
+    { generalize_hyp : Module.to_cycles x = y at ⊢ h,
+      delta homology.π at h,
+      suffices : is_iso (cokernel.π (image_to_kernel (X.d_to i) (X.d_from i) (X.d_to_comp_d_from i))),
+      { refine eq.trans _ (eq.trans (congr_arg (@inv _ _ _ _ _ this) h) (map_zero _)), simp },
+      convert cokernel.π_zero_is_iso,
+      all_goals
+      { apply zero_of_source_iso_zero,
+        refine (image_subobject_iso _).trans _,
+        apply category_theory.limits.image_zero',
+        delta homological_complex.d_to, rw hi } } }
+end
+
 end Modules
 
+section retract
+
+universes v v'
+parameters {R : Type v} [comm_ring R]
+parameters {ι : Type} {c : complex_shape ι}
+
+
+/-
+We should be able to prove that iterating barycentric subdivision enough times,
+depending on the input simplex, gives a chain map C_*(X) -> C_*(X) which is a retraction onto
+the subcomplex of chains bounded by an open cover 𝒰, as in Hatcher. But this subtly requires that
+if τ is a face of σ and B^k(σ) ∈ C_n^𝒰(X) then B^k(τ) ∈ C_n^𝒰(X).
+This follows from the fact that B is secretly a morphism of simplicial abelian groups
+Sing_•(X) → Sing_•(X), and so commutes with face maps. But in a general chain complex we don't
+have access to the face maps (Dold Kan is *not* about the Moore complex, but the normalized Moore complex)
+and so it's awkward to state the lemma. Also proving this would be a lot of work
+-/
+
+-- local attribute [instance] classical.prop_decidable 
+
+def homotopy.iterate {V : Type v} [category.{v'} V] [preadditive V] 
+  {C : homological_complex V c} {f : C ⟶ C}
+  (s : homotopy (𝟙 C) f)
+  : Π (k : ℕ), homotopy (𝟙 C) (f ^ k : End C)
+| 0       := homotopy.refl (𝟙 C)
+| (k + 1) := (homotopy.iterate k).trans (s.symm.comp_left_id (f ^ k : End C)).symm
+
+lemma chain_map_iterate {V : Type v} [category.{v'} V] [has_zero_morphisms V]
+  {C : homological_complex V c} (f : C ⟶ C)
+  (k : ℕ) (i : ι) : (f ^ k : End C).f i = (f.f i ^ k : End (C.X i)) :=
+begin
+  induction k with k ih,
+  { refl },
+  { rw [← npow_eq_pow, ← npow_eq_pow, monoid.npow_succ', monoid.npow_succ'],
+    exact congr_arg2 category_struct.comp ih rfl }
 end
+
+-- lemma homotopy.iterate_as_sum {V : Type v} [category.{v'} V] [preadditive V]
+--   {C : homological_complex V c} {f : C ⟶ C}
+--   (s : homotopy (𝟙 C) f) (k : ℕ) (i j : ι)
+--   : (s.iterate k).hom i j = finset.univ.sum (λ p : fin k, (f^(p : ℕ) : End C).f i ≫ s.hom i j) :=
+-- begin
+--   by_cases c.rel j i,
+--   { induction k with k ih,
+--     { refl },
+--     { simp [homotopy.iterate],
+--       rw fin.sum_univ_cast_succ,
+--       simp,
+--       rw ih,
+--       congr,
+--       simp [homotopy.symm, homotopy.comp_left_id] } },
+--   { rw (s.iterate k).zero i j h, simp_rw s.zero i j h, simp }
+-- end
+
+-- noncomputable
+-- def homotopy.iter_until_in_subcomplex
+--   {ι' : ι → Type}
+--   {C : homological_complex (Module.{v'} R) c}
+--   (b : Π (i : ι), basis (ι' i) R (C.X i))
+--   (M : Π (i : ι), submodule R (C.X i))
+--   (f : C ⟶ C)
+--   (H : ∀ i x, ∃ k, (f.f i)^[k] x ∈ M i)
+--   (s : homotopy (𝟙 C) f) (i j : ι) : C.X i ⟶ C.X j :=
+--   (b i).constr R (λ ℓ, (s.iterate (nat.find (H i (b i ℓ)))).hom i j (b i ℓ))
+
+-- lemma d_next_of_iter_until_in_subcomplex_on_basis 
+--   {ι' : ι → Type}
+--   {C : homological_complex (Module.{v'} R) c}
+--   (b : Π (i : ι), basis (ι' i) R (C.X i))
+--   (M : Π (i : ι), submodule R (C.X i))
+--   (f : C ⟶ C)
+--   (H : ∀ i x, ∃ k, (f.f i)^[k] x ∈ M i)
+--   (s : homotopy (𝟙 C) f) (i : ι) (ℓ : ι' i)
+--   : prev_d i (homotopy.iter_until_in_subcomplex b M f H s) (b i ℓ)
+--   = prev_d i (s.iterate (nat.find (H i (b i ℓ)))).hom (b i ℓ) :=
+-- begin
+-- destruct c.prev i,
+-- { intro h, delta prev_d, simp, rw h },
+-- { rintros ⟨j, hij⟩ h, delta prev_d, simp, rw h, simp,
+--   refine congr_arg _ _,
+--   exact basis.constr_basis _ _ _ _ }
+-- end
+
+-- noncomputable
+-- def retract_free_of_eventually_in_submodule
+--   {ι' : ι → Type}
+--   (C : homological_complex (Module.{v'} R) c)
+--   (b : Π (i : ι), basis (ι' i) R (C.X i))
+--   (M : Π (i : ι), submodule R (C.X i))
+--   (f : C ⟶ C)
+--   (H : ∀ i x, ∃ k, (f.f i)^[k] x ∈ (M i))
+--   (s : homotopy (𝟙 C) f)
+--   : C ⟶ C := {
+--     f := λ i, (𝟙 (C.X i)) - (d_next i) (homotopy.iter_until_in_subcomplex b M f H s)
+--                           - (prev_d i) (homotopy.iter_until_in_subcomplex b M f H s),
+--     comm' := by {
+--       intros i j hij,
+--       apply (b i).ext, intro ℓ,
+--       simp, rw sub_right_comm,
+--       congr, 
+--       { repeat { rw ← comp_apply },
+--         refine congr_fun (congr_arg coe_fn _) _,
+--         transitivity (0 : C.X i ⟶ C.X j),
+--         { rw ← d_from_comp_X_next_iso _ hij,
+--           swap, apply_instance, 
+--           rw ← category.assoc (C.d_to i), simp },
+--         { rw ← X_prev_iso_comp_d_to _ hij,
+--           rw [category.assoc, ← category.assoc (C.d_to j)], simp } },
+--       { repeat { rw ← comp_apply },
+--         refine congr_fun (congr_arg coe_fn _) _,
+--         rw [← category.assoc, ← d_next_eq_d_from_from_next, d_next_eq _ hij],
+--         rw category.assoc, refine congr_arg _ _,
+--         rw ← prev_d_eq _ hij, simp } } }
+
+-- def retract_free_of_eventually_in_submodule_eventually_in
+--   {ι' : ι → Type}
+--   (C : homological_complex (Module.{v'} R) c)
+--   (b : Π (i : ι), basis (ι' i) R (C.X i))
+--   (M : Π (i : ι), submodule R (C.X i))
+--   (f : C ⟶ C)
+--   (H : ∀ i x, ∃ k, (f.f i)^[k] x ∈ M i)
+--   (s : homotopy (𝟙 C) f)
+--   (hb : ∀ i j, submodule.map (C.d i j) (M i) ≤ M j)
+--   (hs : ∀ i j, submodule.map (s.hom i j) (M i) ≤ M j)
+--   (hf : ∀ i, submodule.map (f.f i) (M i) ≤ M i)
+--   (hboundary_in_M_only_if : ∀ i ℓ, b i ℓ ∈ M i
+--                           → ∀ j m, (b j).repr (C.d i j (b i ℓ)) m ≠ 0 → b j m ∈ M j)
+--   : ∀ i, linear_map.range ((retract_free_of_eventually_in_submodule C b M f H s).f i)
+--        ≤ M i :=
+-- begin
+--   have : ∀ i ℓ j m, (b j).repr (C.d i j (b i ℓ)) m ≠ 0
+--                   → nat.find (H j (b j m)) ≤ nat.find (H i (b i ℓ)),
+--   { intros i ℓ j m h,
+--     apply nat.find_le,
+--     have := nat.find_spec (H i (b i ℓ)), revert this,
+--     generalize : nat.find (H i (b i ℓ)) = k, intro h,
+--      },
+--   intro i,
+--   rw linear_map.range_eq_map,
+--   rw ← (b i).span_eq,
+--   rw submodule.map_span_le,
+--   rintros x ⟨ℓ, h⟩, subst h,
+--   dsimp [retract_free_of_eventually_in_submodule],
+--   rw d_next_of_iter_until_in_subcomplex_on_basis,
+--   have := (s.iterate (nat.find (H i (b i ℓ)))).comm i,
+--   rw ← sub_eq_iff_eq_add at this,
+--   symmetry' at this, rw add_comm at this, symmetry' at this, rw ← sub_eq_iff_eq_add at this,
+--   rw ← this,
+--   simp,
+--   rw [sub_right_comm, sub_sub _ _ ((from_next i (s.iterate _).hom _)), ← sub_add],
+--   simp, rw add_sub_assoc,
+--   apply submodule.add_mem,
+--   { convert nat.find_spec (H i (b i ℓ)),
+--     generalize : nat.find (H i (b i ℓ)) = k,
+--     induction k with k ih,
+--     { refl },
+--     { rw nat.iterate_succ,
+--       rw ← npow_eq_pow,
+--       rw monoid.npow_succ',
+--       rw ← ih,
+--       refl } },
+--   {  }
+--   -- refine eq.trans (congr_arg2 _ _ _) (add_zero _),
+--   -- { transitivity (f ^ 0 : End C).f i (b i ℓ),
+--   --   { congr, simp,
+--   --     exact submodule.subset_span ⟨ℓ, hℓ, rfl⟩ },
+--   --   { refl } },
+-- end
+
+-- def retract_free_of_eventually_in_submodule_homotopic
+--   {ι' : ι → Type}
+--   (C : homological_complex (Module.{v'} R) c)
+--   (b : Π (i : ι), basis (ι' i) R (C.X i))
+--   (b' : Π (i : ι), ι' i → Prop)
+--   (f : C ⟶ C)
+--   (H : ∀ i x, ∃ k, (f.f i)^[k] x ∈ submodule.span R (b i '' { ℓ | b' i ℓ }))
+--   (s : homotopy (𝟙 C) f)
+--   (hf : ∀ (i : ι) (ℓ : ι' i), f.f i (b i ℓ) ∈ submodule.span R (b i '' { m | b' i m }))
+--   (hb' : ∀ (i j : ι) (ℓ : ι' i), C.d i j (b i ℓ) ∈ submodule.span R (b j '' { m | b' j m }))
+--   : homotopy (𝟙 C) (retract_free_of_eventual_retract_on_basis C b (λ j, submodule.span R (b j '' { ℓ | b' j ℓ })) f H s) :=
+-- begin
+--   admit
+-- end
+
+end retract
+
+section Modules
+
+universes u u' v v'
+
+parameters {C : Type u} {R : Type v} [category.{u'} C] [comm_ring R]
+parameters {ι : Type} {c : complex_shape ι}
+
+def Module.subcomplex_of_compatible_submodules
+  (C : homological_complex (Module.{v'} R) c)
+  (M : Π (i : ι), submodule R (C.X i))
+  (hcompat : ∀ i j, submodule.map (C.d i j) (M i) ≤ M j)
+  : homological_complex (Module.{v'} R) c := {
+    X := λ i, Module.of R (M i),
+    d := λ i j, linear_map.cod_restrict (M j) 
+                                        (linear_map.dom_restrict (C.d i j) (M i))
+                                        (λ x, hcompat i j (submodule.mem_map_of_mem x.property)),
+    d_comp_d' := by { intros i j k hij hjk, ext, cases x with x hx, 
+                      simp, rw ← comp_apply, rw C.d_comp_d, refl },
+    shape' := by { intros i j hij, ext, cases x with x hx, simp, rw C.shape' i j hij, refl } }
+
+def Module.subcomplex_of_compatible_submodules_inclusion
+  (C : homological_complex (Module.{v'} R) c)
+  (M : Π (i : ι), submodule R (C.X i))
+  (hcompat : ∀ i j, submodule.map (C.d i j) (M i) ≤ M j)
+  : Module.subcomplex_of_compatible_submodules C M hcompat ⟶ C := {
+    f := λ i, (M i).subtype
+  }
+
+lemma quasi_iso_of_lift_boundaries_and_cycles
+  {C D : homological_complex (Module.{v'} R) c} (f : C ⟶ D)
+  (h1 : ∀ i j x y, C.d_from j y = 0 → D.d i j x = f.f j y → ∃ z, C.d i j z = y)
+  (h2 : ∀ j x, D.d_from j x = 0 → ∃ i y z, C.d_from j y = 0 ∧ f.f j y = x + D.d i j z)
+  : quasi_iso f :=
+begin
+  constructor,
+  intro i,
+  suffices : function.bijective ((homology_functor (Module R) c i).map f),
+  { let f' := linear_equiv.of_bijective _ this.left this.right,
+    constructor,
+    refine exists.intro f'.symm _,
+    split; ext, { apply f'.left_inv }, { apply f'.right_inv } },
+  split,
+  { rw [← linear_map.ker_eq_bot, linear_map.ker_eq_bot'],
+    intros x hx,
+    obtain ⟨h, h'⟩ := C.preim_of_homology_class_spec x,
+    generalize_hyp : C.preim_of_homology_class x = x' at h h', subst h',
+    have := congr_arg linear_map.to_fun (@Module.to_homology_comp_homology_functor_map R _ ι c C D f i),
+    replace this := congr_fun this (⟨x', h⟩ : linear_map.ker (C.d_from i)),
+    replace this := eq.trans this.symm hx,
+    simp [Module.as_hom_right] at this,
+    destruct (c.prev i),
+    { intro h', rw ← Module.to_homology_eq_zero' h' at this ⊢,
+      obtain ⟨z, hz⟩ := h1 i i 0 x' h (eq.trans (map_zero _) (subtype.ext_iff_val.mp this.symm)),
+      have : ¬ c.rel i i, { intro hi', rw c.prev_eq_some hi' at h', injection h' },
+      rw C.shape i i this at hz, symmetry, exact subtype.eq hz },
+    { rintro ⟨j, hij⟩ _,
+      rw ← Module.to_homology_eq_zero hij,
+      rw ← Module.to_homology_eq_zero hij at this,
+      simp at this, obtain ⟨y, hy⟩ := this,
+      exact h1 j i y x' h hy } },
+  { intro x,
+    obtain ⟨h, h'⟩ := D.preim_of_homology_class_spec x,
+    generalize_hyp : D.preim_of_homology_class x = x' at h h', subst h',
+    obtain ⟨j, y, z, hy, hz⟩ := h2 i x' h,
+    existsi Module.to_homology ⟨y, hy⟩,
+    have := congr_arg linear_map.to_fun (@Module.to_homology_comp_homology_functor_map R _ ι c C D f i),
+    replace this := congr_fun this (⟨y, hy⟩ : linear_map.ker (C.d_from i)),
+    refine eq.trans this _,
+    exact Module.to_homology_ext z hz }
+end
+
+lemma subcomplex_inclusion_quasi_iso_of_pseudo_projection
+  {C : homological_complex (Module.{v'} R) c}
+  (M : Π (i : ι), submodule R (C.X i))
+  (hcompat : ∀ i j, submodule.map (C.d i j) (M i) ≤ M j)
+  (p : C ⟶ C) (s : homotopy (𝟙 C) p)
+  (hp_eventual : ∀ i x, ∃ k, (p.f i)^[k] x ∈ M i)
+  (hp : ∀ i, submodule.map (p.f i) (M i) ≤ M i)
+  (hs : ∀ i j, submodule.map (s.hom i j) (M i) ≤ M j)
+  : quasi_iso (Module.subcomplex_of_compatible_submodules_inclusion C M hcompat) :=
+begin
+  have hp_iter : ∀ i k {x}, x ∈ M i → ((p.f i)^[k] x) ∈ M i, 
+  { intros i k x hx, induction k with k ih,
+    { exact hx },
+    { rw nat.iterate_succ,
+      refine hp i _,
+      existsi ((p.f i)^[k] x), exact ⟨ih, rfl⟩ } },
+  have hs_iter : ∀ i j k, submodule.map ((s.iterate k).hom i j) (M i) ≤ M j,
+  { intros i j k, specialize hs i j,
+    rw submodule.map_le_iff_le_comap at ⊢ hs,
+    intros x hx, simp,
+    induction k with k ih,
+    { exact zero_mem _, },
+    { simp [homotopy.iterate],
+      apply submodule.add_mem,
+      { exact ih },
+      { refine hs _, rw chain_map_iterate p k,
+        rw concrete_category.pow_eq_iter, 
+        exact hp_iter i k hx } } },
+  apply quasi_iso_of_lift_boundaries_and_cycles, 
+  { intros i j x y hy hx,
+    obtain ⟨k, hk⟩ := hp_eventual i x,
+    refine exists.intro (⟨(s.iterate k).hom j i y.val, _⟩ + ⟨(p.f i)^[k] x, hk⟩) _,
+    { refine hs_iter j i k _, exact submodule.mem_map_of_mem y.property },
+    { ext,
+      delta Module.subcomplex_of_compatible_submodules,
+      delta Module.subcomplex_of_compatible_submodules_inclusion at hx,
+      simp at ⊢ hx,
+      refine eq.trans _ hx,
+      by_cases (c.rel i j),
+      { rw ← hx,
+        rw ← comp_apply _ ((s.iterate k).hom j i), 
+        rw ← d_next_eq _ h,
+        dsimp,
+        have := (s.iterate k).comm i,
+        rw ← sub_eq_iff_eq_add at this,
+        rw ← sub_eq_iff_eq_add at this,
+        rw ← this,
+        simp,
+        rw (_ : (C.d i j) (C.d_to i (to_prev i (s.iterate k).hom x)) = 0),
+        rw sub_zero,
+        rw sub_add,
+        convert sub_zero _,
+        { rw sub_eq_zero,
+          refine congr_arg _ _,
+          rw chain_map_iterate,
+          rw concrete_category.pow_eq_iter },
+        { rw ← homological_complex.d_from_comp_X_next_iso _ h,
+          rw ← comp_apply,
+          rw ← category.assoc,
+          simp, apply_instance } },
+      { rw C.shape' i j h, simp } } },
+  { intros j x hx,
+    obtain ⟨k, hk⟩ := hp_eventual j x,
+    have : x - ((p.f j)^[k] x) = prev_d j (s.iterate k).hom x,
+    { have := (s.iterate k).comm j,
+      rw ← sub_eq_iff_eq_add at this,
+      transitivity d_next j (s.iterate k).hom x + prev_d j (s.iterate k).hom x,
+      { convert congr_fun (congr_arg coe_fn this) x,
+        rw [chain_map_iterate, concrete_category.pow_eq_iter] },
+      { symmetry,
+        convert add_zero _,
+        destruct (c.next j),
+        { intro h, delta d_next, rw h, simp },
+        { rintros ⟨i, h⟩ _,
+          rw d_next_eq _ h,
+          dsimp,
+          rw ← d_from_comp_X_next_iso _ h,
+          dsimp, rw hx, simp } } },
+    rw exists_comm, refine ⟨⟨_, hk⟩, _⟩,
+    simp_rw [exists_and_distrib_left],
+    split, 
+    { destruct (c.next j),
+      { intro h', delta homological_complex.d_from, rw h', simp },
+      { rintros ⟨ℓ, h'⟩ _, rw d_from_eq _ h', simp,
+        convert map_zero _,
+        dsimp [Module.subcomplex_of_compatible_submodules],
+        apply subtype.eq, simp,
+        rw [← concrete_category.pow_eq_iter, ← chain_map_iterate],
+        rw [← comp_apply, homological_complex.hom.comm, comp_apply],
+        rw [← d_from_comp_X_next_iso _ h', comp_apply, hx], simp } },
+    destruct (c.prev j),
+    { intro h,
+      existsi j, refine ⟨0, _⟩,
+      simp,
+      delta prev_d at this, rw h at this, simp at this,
+      rw sub_eq_zero at this, symmetry' at this, exact this },
+    { rintros ⟨i, hi⟩ _, existsi i,
+      rw prev_d_eq _ hi at this, dsimp at this, rw sub_eq_iff_eq_add at this,
+      existsi - (s.iterate k).hom j i x,
+      rw [map_neg, ← sub_eq_add_neg, eq_sub_iff_add_eq],
+      symmetry, rw add_comm, exact this } }
+end
+
+end Modules

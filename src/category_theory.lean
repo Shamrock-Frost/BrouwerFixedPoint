@@ -1,5 +1,12 @@
 import category_theory.isomorphism category_theory.concrete_category
 import category_theory.limits.shapes.equalizers
+import category_theory.endomorphism
+
+-- Should not be here...
+lemma nat.iterate_succ {α : Type*} (f : α → α)
+  : ∀ (n : ℕ) (x0 : α), f^[n + 1] x0 = f (f^[n] x0)
+| 0       x0 := rfl
+| (n + 1) x0 := nat.iterate_succ n (f x0)
 
 namespace category_theory
 
@@ -79,5 +86,14 @@ def parallel_pair_comp.is_colimit_pair_to_is_colimit_comp
                                           refine congr_arg (λ w, w ≫ m) _,
                                           refine eq.trans _ (category.assoc _ _ _),
                                           simp }) }
+
+lemma concrete_category.pow_eq_iter {C : Type*} [category C] [concrete_category C] {X : C} (f : X ⟶ X)
+  (k : ℕ) : @coe_fn _ _ concrete_category.has_coe_to_fun (f ^ k : End X) = (f^[k]) :=
+begin
+  ext x,
+  induction k with k ih,
+  { simp, refl },
+  { rw nat.iterate_succ, rw ← npow_eq_pow, dsimp [monoid.npow, npow_rec], simp, congr, exact ih }
+end
 
 end category_theory

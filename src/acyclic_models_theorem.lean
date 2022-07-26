@@ -164,7 +164,7 @@ lemma first_step_zero_in_homology
 begin
   transitivity, apply lift_nat_trans_deg0_is_lift, simp,
   refine eq.trans _ (map_zero (ϕ.app ((b 1).models i))), congr,
-  apply Module.to_homology_eq_zero (complex_shape.down_mk 1 0 (nat.zero_add 1)),
+  rw ← Module.to_homology_eq_zero (complex_shape.down_mk 1 0 (nat.zero_add 1)),
   apply linear_map.mem_range_self
 end
 

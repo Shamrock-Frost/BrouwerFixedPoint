@@ -65,3 +65,90 @@ begin
   apply hp,
   existsi x, refl
 end
+
+local attribute [instance] classical.prop_decidable 
+lemma basis.mem_span_iff (R : Type) [comm_ring R] {M : Type*}
+  [add_comm_monoid M] [module R M] {ι : Type*}
+  (b : basis ι R M) (S : set M) (hS : S ⊆ set.range b) (x : M)
+  : x ∈ submodule.span R S ↔ (∀ i, b.repr x i ≠ 0 → b i ∈ S) :=
+begin
+  by_cases ax1 : nonempty ι, swap,
+  { simp at ax1,
+    have h1 : ∀ y, b.repr y = 0,
+    { intro, rw ← finsupp.support_eq_empty, exact @finset.eq_empty_of_is_empty _ ax1 _ },
+    have : ∀ y : M, y = 0,
+    { intro y, refine eq.trans (b.total_repr y).symm _, rw h1, apply map_zero },
+    rw [this x, h1],
+    simp, },
+  by_cases ax2 : nontrivial R, swap,
+  { rw nontrivial_iff at ax2, simp_rw [not_exists, not_not] at ax2,
+    have : x = 0 := eq.trans (one_smul R x).symm (eq.trans (congr_arg2 _ (ax2 1 0) (refl x)) (zero_smul _ _)),
+    rw this, rw (_ : ∀ y, b.repr y = 0), simp,
+    intro, ext, apply ax2 },
+  split,
+  { intros h i,
+    apply submodule.span_induction h,
+    { intros y hy1 hy2,
+      have := @function.inv_fun_eq _ _ ax1 _ _ (hS hy1),
+      dsimp at this,
+      rw ← this at hy2, simp at hy2,
+      rw finsupp.single_apply at hy2,
+      split_ifs at hy2,
+      { rw h_1 at this, rw this, exact hy1 },
+      { exfalso, apply hy2, refl } },
+    { intro hi, exfalso, apply hi, simp },
+    { intros y z hy hz hsum,
+      simp at hsum,
+      by_cases b.repr y i = 0 ∧ b.repr z i = 0,
+      { exfalso, rw [h.left, h.right] at hsum, simp at hsum, exact hsum },
+      { rw decidable.not_and_iff_or_not at h, cases h with h,
+        { exact hy h },
+        { exact hz h_1 }, } },
+    { intros r x hx hrx, apply hx,
+      simp at hrx,
+      intro h', rw h' at hrx, apply hrx, simp, } },
+  { intro h,
+    refine (finsupp.mem_span_iff_total R S x).mpr _,
+    let l : S →₀ R := finsupp.comap_domain (@function.inv_fun ι M ax1 (b : ι → M) ∘ subtype.val)
+                                           (b.repr x)
+                                           _,
+    swap,
+    { rintros ⟨a, ha⟩ _ ⟨a', ha'⟩ _ haa', simp at ⊢ haa', 
+      exact eq.trans (@function.inv_fun_eq _ _ ax1 _ _ (hS ha)).symm
+                     (eq.trans (congr_arg b haa') (@function.inv_fun_eq _ _ ax1 _ _ (hS ha'))) },
+    existsi l,
+    refine eq.trans _ (b.total_repr x),
+    simp [finsupp.total, finsupp.sum], 
+    refine finset.sum_bij (λ s _, @function.inv_fun ι M ax1 (b : ι → M) s.val)
+                          _ _ _ _,
+    { intro, simp },
+    { rintros ⟨s, hs⟩ hs', simp at ⊢ hs',
+      symmetry, exact congr_arg2 _ rfl (@function.inv_fun_eq _ _ ax1 _ _ (hS hs)), },
+    { rintros ⟨a, ha⟩ ⟨a', ha'⟩ _ _ haa', apply subtype.eq,
+      exact eq.trans (@function.inv_fun_eq _ _ ax1 _ _ (hS ha)).symm
+                     (eq.trans (congr_arg b haa') (@function.inv_fun_eq _ _ ax1 _ _ (hS ha'))) },
+    { intros i hi, simp at hi,
+      refine exists.intro ⟨b i, h i hi⟩ _,
+      have : @function.inv_fun _ _ ax1 b (b i) = i,
+      { refine (@basis.injective _ _ _ _ _ _ b ax2) _ _ _,
+        exact (@function.inv_fun_eq _ _ ax1 _ _ (hS (h i hi))) },
+      refine exists.intro _ _,
+      { simp, convert hi },
+      { symmetry, apply this } } }
+end
+
+lemma submodule.inf_spans_free (R : Type) [comm_ring R] {M : Type*}
+  [add_comm_monoid M] [module R M] {ι : Type*}
+  (b : basis ι R M)
+  (S T : set M) (hS : S ⊆ set.range b) (hT : T ⊆ set.range b)
+  : submodule.span R S ⊓ submodule.span R T = submodule.span R (S ∩ T) :=
+begin
+  ext x, split; intro h,
+  { simp at h, 
+    rw [basis.mem_span_iff R b S hS, basis.mem_span_iff R b T hT] at h, cases h with h1 h2,
+    rw basis.mem_span_iff R b (S ∩ T) (subset_trans (set.inter_subset_left S T) hS),
+    intros i hi, exact ⟨h1 i hi, h2 i hi⟩ },
+  { rw basis.mem_span_iff R b (S ∩ T) (subset_trans (set.inter_subset_left S T) hS) at h,
+    simp, rw [basis.mem_span_iff R b S hS, basis.mem_span_iff R b T hT],
+    split; intros i hi, { exact (h i hi).left }, { exact (h i hi).right } }
+end

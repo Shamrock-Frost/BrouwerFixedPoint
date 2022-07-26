@@ -181,6 +181,17 @@ begin
     exact topological_simplex.has_one_implies_eq_zero n i x hi _ h }
 end
 
+lemma vertex_coord_binary (n : ℕ) (i j : simplex_category.mk n) : 
+  @coe_fn _ _ (simplex_category.to_Top'_obj.has_coe_to_fun (simplex_category.mk n))
+              (vertex n i) j = 0
+  ∨ @coe_fn _ _ (simplex_category.to_Top'_obj.has_coe_to_fun (simplex_category.mk n))
+              (vertex n i) j = 1 := 
+begin
+  by_cases (i = j),
+  { subst h, right, apply vertex_coord_one },
+  { left, apply vertex_coord_zero, assumption }
+end
+
 lemma const_desc (n : ℕ) (i : simplex_category.mk (n + 1)) (x : topological_simplex n)
   : const_vertex n i x = vertex (n+1) i :=
 begin

@@ -43,6 +43,20 @@ lemma lift_along_quot_map_spec {α β γ : Top} (q : α ⟶ β) (f : α ⟶ γ) 
   H (classical.some (lift_along_quot_map._proof_1 q Hquot b)) a
     ((classical.some_spec (Hquot.left b)).trans h.symm)
 
+lemma lift_along_quot_map_comm_square
+  {α β γ δ : Top} (q : α ⟶ β)
+  (f : α ⟶ γ) (g : γ ⟶ δ)
+  (Hquot : quotient_map q)
+  (H : ∀ x y, q x = q y → f x = f y)
+  : lift_along_quot_map q f Hquot H ≫ g
+  = lift_along_quot_map q (f ≫ g) Hquot (λ x y Hxy, (congr_arg g (H x y Hxy) : g (f x) = g (f y))) := 
+begin
+  ext b, obtain ⟨a, ha⟩ := Hquot.left b,
+  symmetry,
+  refine eq.trans (lift_along_quot_map_spec q (f ≫ g) Hquot _ b a ha) _,
+  symmetry, exact congr_arg g (lift_along_quot_map_spec q f Hquot H b a ha)
+end
+
 universe u
 noncomputable
 def cylinder : Top.{u} ⥤ Top.{u} := {
