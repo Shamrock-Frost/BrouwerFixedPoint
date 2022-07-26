@@ -77,6 +77,15 @@ def spanned_by_sat_basis (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid 
   }
 }
 
+lemma spanned_by_sat_basis_apply (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid M] [module R M]
+                                 {ι : Type*} (b : basis ι R M) (s : set ι)
+                                 (i : ι) (hi : i ∈ s)
+                                 : spanned_by_sat_basis R M b s ⟨i, hi⟩
+                                 = ⟨b i, submodule.subset_span (set.mem_image_of_mem b hi)⟩ :=
+begin
+  apply subtype.eq, simp [spanned_by_sat_basis]
+end
+
 def subcomplex_spanned_by (R : Type u) [comm_ring R] {ι' : Type} {c : complex_shape ι'}
                           (C : homological_complex (Module.{w} R) c)
                           {ι : ι' → Type p} (b : Π (i : ι'), basis (ι i) R (C.X i))
@@ -354,7 +363,7 @@ begin
     convert le_of_le_of_eq _ (@finset.sum_const _ _ (@finset.univ ι' _) _ (dist x y)), simp,
     apply finset.sum_le_sum,
     intros i _,
-    rw [subtype.dist_eq, ← dist_eq_norm],
+    rw [← real.dist_eq, subtype.dist_eq],
     apply dist_le_pi_dist },
   { refl },
   { apply norm_nonneg },
@@ -686,10 +695,10 @@ begin
     refine eq.trans _ (norm_smul (n + 1 : ℝ)⁻¹ (finset.univ.sum (λ (j : fin (n + 1)), (vertices j).val - (vertices i).val))),
     rw finset.smul_sum,
     congr,
-    ext, simp, rw mul_sub, congr;
-    rw real.norm_eq_abs; norm_cast },
+    ext, simp, rw mul_sub, congr; norm_cast },
   { rw [div_eq_inv_mul, mul_assoc],
-    refine mul_le_mul (le_refl _) _ _ _,
+    refine mul_le_mul _ _ _ _,
+    { norm_cast },
     { refine le_trans (norm_sum_le _ _) _,
       refine le_of_le_of_eq (@finset.sum_le_sum _ _ _ _ (λ j, if i = j then 0 else metric.diam (set.range vertices)) finset.univ _) _,
       { intros j _,
@@ -830,12 +839,13 @@ lemma cone_of_barycenter_sends_bounded_to_bounded (R : Type) [comm_ring R]
 begin
   cases C with C hC, dsimp, 
   by_cases htrivial : (1 : R) = (0 : R),
-  { rw submodule.mem_inf, split;
+  { split;
     convert submodule.zero_mem _;
     exact eq.trans (one_smul _ _).symm (eq.trans (congr_arg2 _ htrivial rfl) (zero_smul _ _)) },
   have hnontriv : nontrivial R := ⟨⟨1, 0, htrivial⟩⟩,
   dsimp [bounded_diam_submodule, subset_submodule, affine_submodule,
          bounded_by_submodule, spanned_by_sat] at hC,
+  rw [← submodule.mem_inf, ← submodule.mem_inf] at hC,
   rw [submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of D))] at hC,
   rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R n).get_basis (Top.of D))
@@ -845,12 +855,13 @@ begin
                                         ((singular_chain_complex_basis R n).get_basis (Top.of D))
                                         hnontriv)] at hC,
   dsimp [bounded_diam_submodule, bounded_by_submodule, affine_submodule, spanned_by_sat], 
+  rw ← submodule.mem_inf,
   rw [submodule.inf_spans_free R ((singular_chain_complex_basis R (n+1)).get_basis (Top.of D))],
   rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R (n+1)).get_basis (Top.of D))
                                         hnontriv)],
   { refine (submodule.map_span_le _ _ _).mpr _ (submodule.mem_map_of_mem hC),
-    rintros x ⟨⟨i, σ⟩, ⟨⟨⟨s, hs, hσ1⟩, s', hs', hσ2⟩, vs, hσ3⟩, H⟩, cases i, simp at hs', subst hs',
+    rintros x ⟨⟨i, σ⟩, ⟨⟨⟨s, hs, hσ1⟩, s', hs', hσ2⟩, vs, hσ3⟩, H⟩, cases i, subst hs',
     rw ← simplex_to_chain_is_basis at H, subst H, dsimp at hσ3, rw hσ3,
     simp [cone_construction_hom, simplex_to_chain],
     rw cone_construction_lift_vertex_span,
@@ -923,6 +934,7 @@ begin
     rw map_out_desc,
     dsimp [simplex_to_chain], rw singular_chain_complex_differential_desc,
     rw [map_sum, map_sum, map_sum],
+    rw ← submodule.mem_inf,
     refine submodule.sum_mem _ _,
     intros k _,
     rw zsmul_eq_smul_cast R,
@@ -951,7 +963,9 @@ begin
                 (finsupp.single (singular_simplex_of_vertices hConvex
                                 (λ (j : fin (n + 1)), vertices (simplex_category.δ k j))) 1),
                _, _⟩,
+    rw ← submodule.mem_inf,
     convert this,
+    { norm_cast }, { norm_cast },
     { rintros x ⟨w, hx⟩, subst hx,
       refine le_trans (affine_simplex_dist_maximized hConvex vertices (hConvex.barycenter' vertices) w) _,
       apply csupr_le, intro i,
@@ -1357,26 +1371,27 @@ begin
     rw ← nat.iterate_succ (η.app X) }
 end
 
-structure cover (X : Type*) :=
-(cov : set (set X)) (covers : ⋃₀ cov = ⊤)
+def pullback_family_of_sets {X Y : Type*} (cov : set (set Y)) (f : X → Y) := (set.preimage f) '' cov
 
-def cover.pullback {X Y : Type*}
-  (𝒰 : cover Y) (f : X → Y) : cover X := {
-    cov := (set.preimage f) '' 𝒰.cov,
-    covers := by { rw set.sUnion_image, simp_rw ← set.preimage_Union,
-                   rw ← set.sUnion_eq_bUnion, rw 𝒰.covers, exact set.preimage_univ }
-  }
+lemma pullback_family_of_sets_covers {X Y : Type*} (cov : set (set Y)) (f : X → Y)
+  (hcov : ⋃₀ cov = ⊤) : ⋃₀ (pullback_family_of_sets cov f) = ⊤ :=
+begin
+  delta pullback_family_of_sets,
+  rw set.sUnion_image, simp_rw ← set.preimage_Union,
+  rw ← set.sUnion_eq_bUnion, rw hcov, exact set.preimage_univ
+end
 
-lemma cover.pullback_by_continuous {X Y : Type*} [topological_space X] [topological_space Y]
-  (𝒰 : cover Y) (hOpen : ∀ s, s ∈ 𝒰.cov → is_open s) (f : C(X, Y))
-  : ∀ t, t ∈ (𝒰.pullback f).cov → is_open t :=
+lemma pullback_family_of_sets_by_continuous {X Y : Type*}
+  [topological_space X] [topological_space Y] (cov : set (set Y))
+  (hOpen : ∀ s, s ∈ cov → is_open s) (f : C(X, Y))
+  : ∀ t, t ∈ pullback_family_of_sets cov f → is_open t :=
   by { rintros t ⟨s, hs, h⟩, subst h, refine (hOpen s hs).preimage f.continuous }
 
 lemma bounded_by_subcomplex_map_pullback_le (R : Type) [comm_ring R] {X Y : Top}
-  (𝒰 : cover Y) (f : X ⟶ Y) (n : ℕ)
+  (cov : set (set Y)) (f : X ⟶ Y) (n : ℕ)
   : submodule.map (((singular_chain_complex R).map f).f n)
-                  (bounded_by_submodule R (𝒰.pullback f).cov n)
-  ≤ bounded_by_submodule R 𝒰.cov n :=
+                  (bounded_by_submodule R (pullback_family_of_sets cov f) n)
+  ≤ bounded_by_submodule R cov n :=
 begin
   refine (linear_map.map_span_le _ _ _).mpr _,
   rintros C ⟨⟨i, σ⟩, ⟨t, ht, hσ⟩, h⟩, subst h, cases i,
@@ -1421,7 +1436,6 @@ begin
         convert barycentric_subdivision_subset' R X n σ,
         -- the fact that we need this suggests bad design
         cases X, refl } } },
-  let 𝒰 := cover.mk cov hcov,
   rw this,
   revert C,
   rw [← submodule.eq_top_iff', ← top_le_iff],
@@ -1429,19 +1443,20 @@ begin
   rw submodule.span_le,
   rintro C ⟨i, σ, h⟩, cases i, dsimp [singular_chain_complex_basis] at σ,
   refine (this C).mp _, subst h,
-  let 𝒰' :=  𝒰.pullback σ,
-  have 𝒰'_is_open := 𝒰.pullback_by_continuous cov_is_open σ,
-  have 𝒰'_nonempty : 𝒰'.cov.nonempty := @set.nonempty.of_sUnion_eq_univ _ ⟨vertex n 0⟩ _ 𝒰'.covers,
+  let cov' :=  pullback_family_of_sets cov σ,
+  have cov'_is_open := pullback_family_of_sets_by_continuous cov cov_is_open σ,
+  have hcov' := pullback_family_of_sets_covers cov σ hcov,
+  have cov'_nonempty : cov'.nonempty := @set.nonempty.of_sUnion_eq_univ _ ⟨vertex n 0⟩ _ hcov',
   obtain ⟨δ, δ_pos, hδ⟩ := @bounded_diam_subcomplex_le_cover_subcomplex (fin (n + 1)) _
                             (topological_simplex n)
                             (compact_std_simplex (fin (n + 1)))
-                            R _ 𝒰'.cov 𝒰'_is_open 𝒰'.covers 𝒰'_nonempty n,
+                            R _ cov' cov'_is_open hcov' cov'_nonempty n,
   simp_rw nat_trans.iter_naturality,
   have : (n : ℝ) / (n + 1 : ℝ) < 1,
   { rw div_lt_one_iff, left, norm_cast, simp },
   obtain ⟨k, hk⟩ := exists_pow_lt_of_lt_one (nnreal.coe_pos.mpr δ_pos) this,
   existsi k, dsimp,
-  convert bounded_by_subcomplex_map_pullback_le R 𝒰 σ n _,
+  convert bounded_by_subcomplex_map_pullback_le R cov σ n _,
   apply submodule.mem_map_of_mem,
   refine hδ _,
   convert bounded_diam_submodule_monotone R _ _ _ n
@@ -1450,8 +1465,7 @@ begin
   { have hk' : ((↑n / (↑n + 1)) ^ k : nnreal) ≤ δ,
     { apply le_of_lt,
       rw ← nnreal.coe_lt_coe,
-      convert hk,
-      simp, },
+      convert hk },
     rw ← mul_one ((↑n / (↑n + 1)) ^ k : nnreal) at hk',
     refine le_trans _ hk',
     apply mul_le_mul,
@@ -1479,6 +1493,38 @@ def bounded_by_subcomplex_inclusion (R : Type) [comm_ring R] {X : Top} (cov : se
           { exact bounded_by_subcomplex_compat R cov i j (submodule.mem_map_of_mem hx) },
           { rw homological_complex.shape' _ i j h, simp } })
 
+-- This does typecheck but it takes forever... why???
+lemma subdivision_chain_homotopy_of_bounded_is_bounded
+  (R : Type) [comm_ring R] {X : Top}
+  (cov : set (set X)) (n : ℕ) (s : set X) (H : s ∈ cov)
+  (σ : Top.of (topological_simplex n) ⟶ X) (hσ : set.range σ ⊆ s)
+  : ((barycentric_subdivision_homotopic_id R).to_chain_htpy X).hom n (n+1) (simplex_to_chain σ R)
+  ∈ bounded_by_submodule R cov (n + 1) :=
+begin
+  rw simplex_to_chain_is_basis,
+  dsimp [barycentric_subdivision_homotopic_id, chain_complex.mk_natural_chain_homotopy_rec],
+  delta chain_complex.mk_natural_chain_homotopy,
+  unfold_projs, 
+  dsimp,
+  split_ifs, swap, contradiction,
+  cases n with n,
+  { exact submodule.zero_mem _ },
+  { dsimp,
+    rw map_out_desc,
+    dsimp,
+    refine bounded_by_subcomplex_map_pullback_le R cov σ (n.succ + 1) 
+                                                   (submodule.mem_map_of_mem _), 
+    convert submodule.mem_top,
+    rw eq_top_iff,
+    rw ← subset_subcomplex_univ,
+    apply subset_subcomplex_le_bounded_by_subcomplex R (pullback_family_of_sets cov σ),
+    dsimp [pullback_family_of_sets],
+    refine ⟨s, H, _⟩,
+    rw ← set.univ_subset_iff,
+    rw ← set.preimage_range σ,
+    exact set.preimage_mono hσ }
+end
+
 lemma cover_subcomplex_inclusion_quasi_iso
   (R : Type) [comm_ring R] {X : Top}
   (cov : set (set X)) (cov_is_open : ∀ s, s ∈ cov → is_open s) (hcov : ⋃₀ cov = ⊤)
@@ -1505,7 +1551,7 @@ begin
       dsimp [barycentric_subdivision_in_deg],
       rw map_out_desc,
       simp,
-      have := bounded_by_subcomplex_map_pullback_le R ⟨cov, hcov⟩ σ (i + 1),
+      have := bounded_by_subcomplex_map_pullback_le R cov σ (i + 1),
       refine this (submodule.mem_map_of_mem _), clear this,
       refine subset_subcomplex_le_bounded_by_subcomplex R _ set.univ _ (i + 1) _,
       { existsi s,
@@ -1518,24 +1564,14 @@ begin
     { subst h,
       refine (submodule.map_span_le _ _ _).mpr _,
       rintros C ⟨⟨i, σ⟩, ⟨s, H, hσ⟩, h⟩, subst h, cases i,
-      dsimp [barycentric_subdivision_homotopic_id, chain_complex.mk_natural_chain_homotopy_rec],
-      delta chain_complex.mk_natural_chain_homotopy,
-      unfold_projs, 
-      dsimp,
-      split_ifs, swap, contradiction,
-      cases i with i,
-      { simp, },
-      { simp,
-        rw map_out_desc,
-        have := bounded_by_subcomplex_map_pullback_le R ⟨cov, hcov⟩ σ (i + 2),
-        refine this (submodule.mem_map_of_mem _), clear this,
-        refine subset_subcomplex_le_bounded_by_subcomplex R _ set.univ _ (i + 2) _,
-        { existsi s,
-          refine ⟨H, _⟩,
-          rw ← set.univ_subset_iff,
-          exact subset_trans (subset_of_eq (set.preimage_range _).symm) (set.preimage_mono hσ) },
-        { rw subset_subcomplex_univ, simp } } },
-    { rw ← complex_shape.down_rel at h, rw homotopy.zero' _ i j h, simp } }
+      change ((barycentric_subdivision_homotopic_id R).to_chain_htpy X).hom i (i + 1)
+               ((singular_chain_complex_basis R i).get_basis X ⟨(), σ⟩)
+             ∈ bounded_by_submodule R cov (i + 1),
+      rw ← simplex_to_chain_is_basis,
+      exact subdivision_chain_homotopy_of_bounded_is_bounded R cov i s H σ hσ },
+    { rw ← complex_shape.down_rel at h, rw homotopy.zero' _ i j h, 
+      rw submodule.map_zero, 
+      exact bot_le } }
 end
 
 lemma cover_inclusion_natural (R : Type) [comm_ring R] {X Y : Top} (f : X ⟶ Y)
@@ -1546,27 +1582,7 @@ begin
   ext n : 2,
   apply basis.ext (bounded_by_submodule_basis R covX n),
   rintro ⟨⟨i, σ⟩, s, hs, hσ⟩, cases i,
-  simp only [bounded_by_submodule_basis, spanned_by_sat_basis,
-         bounded_by_subcomplex_map, subcomplex_spanned_by_map,
-         bounded_by_subcomplex_inclusion,
-         Module.subcomplex_of_compatible_submodules_inclusion,
-         subcomplex_spanned_by_map.equations._eqn_1,
-         linear_equiv.coe_symm_mk,
-         bounded_by_submodule_basis.equations._eqn_1,
-         homological_complex.comp_f,
-         bounded_by_subcomplex_inclusion.equations._eqn_1,
-         submodule.coe_mk,
-         eq_self_iff_true,
-         function.comp_app,
-         one_smul,
-         finsupp.total_single,
-         basis.coe_of_repr,
-         Module.subcomplex_of_compatible_submodules_inclusion.equations._eqn_1,
-         finsupp.map_domain_single,
-         submodule.coe_subtype,
-         spanned_by_sat_basis.equations._eqn_1,
-         bounded_by_subcomplex_map.equations._eqn_1,
-         Module.coe_comp,
-         linear_map.cod_restrict_apply,
-         linear_map.dom_restrict_apply]
+  delta bounded_by_submodule_basis,
+  rw spanned_by_sat_basis_apply,
+  refl
 end
