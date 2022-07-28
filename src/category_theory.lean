@@ -1,6 +1,9 @@
 import category_theory.isomorphism category_theory.concrete_category
 import category_theory.limits.shapes.equalizers
 import category_theory.endomorphism
+import category_theory.category.preorder data.fin.basic
+import category_theory.arrow
+import category_theory.category.Cat
 
 -- Should not be here...
 lemma nat.iterate_succ {α : Type*} (f : α → α)

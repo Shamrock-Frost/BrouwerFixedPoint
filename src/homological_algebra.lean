@@ -4,10 +4,16 @@ import algebra.homology.homology
 import algebra.homology.Module
 import algebra.homology.homotopy
 import algebra.homology.quasi_iso
+import category_theory.preadditive.left_exact
+import category_theory.abelian.functor_category
+import data.list.tfae
 
 import for_mathlib.homological_complex_abelian
+import for_mathlib.les_homology
+import for_mathlib.preserves_exact
+import for_mathlib.snake_lemma_naturality2
 
-import .category_theory .linear_algebra
+import .category_theory .linear_algebra .arrow_category
 
 open category_theory category_theory.limits homological_complex
 
@@ -33,6 +39,128 @@ lemma coker_map_spec {V : Type*} [category V] [has_zero_morphisms V] [has_cokern
   : cokernel.π i ≫ cokernel.map i j f' f w1 = f ≫ cokernel.π j :=
   by { delta cokernel.π coequalizer.π cokernel.map, simp }
 
+noncomputable
+def coker_functor_proj (V : Type*) [category V] [has_zero_morphisms V] [has_cokernels V]
+  : arrow.right_func ⟶ coker_functor V := {
+    app := λ f, cokernel.π f.hom,
+    naturality' := λ f g ϕ, by { change ϕ.right ≫ cokernel.π g.hom
+                                      = cokernel.π f.hom ≫ cokernel.map _ _ _ _ ϕ.w.symm,
+                                 rw coker_map_spec,
+                                 refl }
+  }
+
+-- Why can't lean synthesize the arrow_preadditive instance?
+instance coker_additive {V : Type*} [category V] [preadditive V] [has_cokernels V]
+  : @functor.additive _ _ _ _ arrow_preadditive _ (coker_functor V) :=
+  ⟨by { rintros ⟨f⟩ ⟨g⟩ ⟨αl, αr⟩ ⟨βl, βr⟩, dsimp [coker_functor], ext, simp }⟩.
+
+-- lemma coker_right_exact {V : Type*} [category V] [abelian V]
+--   {f g h : arrow V} (α : f ⟶ g) (β : g ⟶ h)
+--   (h : @short_exact _ _ _ _ _ α β
+--                     (@preadditive.preadditive_has_zero_morphisms _ _ arr_ab.to_preadditive)
+--                     arr_ab.has_kernels
+--                     (@abelian.of_coimage_image_comparison_is_iso.has_images _ _
+--                                                                             arr_ab.to_preadditive
+--                                                                             arr_ab.has_kernels
+--                                                                             arr_ab.has_cokernels
+--                                                                             (@abelian.coimage_image_comparison.category_theory.is_iso _ _ arr_ab)))
+--   : exact ((coker_functor V).map f) (F.map g) ∧ epi (F.map g)
+
+section snake_diagram 
+
+open category_theory.snake_diagram
+
+local notation x `⟶[`D`]` y := D.map (hom x y)
+
+lemma to_zero_exact_of_epi {V : Type*} [category V] [abelian V] {X Y : V} (Z : V) (f : X ⟶ Y)
+  : epi f → exact f (0 : Y ⟶ Z) := ((abelian.tfae_epi Z f).out 0 2).mp
+
+def cokernel_sequence
+  {V : Type*} [category V] [abelian V]
+  (D : snake_input V)
+  (h1 : epi ((2, 1) ⟶[D] (2, 2)))
+  : exact_seq V [((3, 0) ⟶[D] (3, 1)), ((3, 1) ⟶[D] (3, 2)), (0 : D.obj (3, 2) ⟶ 0)] :=
+  have h2 : exact ((3, 0) ⟶[D] (3, 1)) ((3, 1) ⟶[D] (3, 2)) := D.2.row_exact _,
+  have h3 : epi ((3, 1) ⟶[D] (3, 2)),
+  begin
+    letI := h1,
+    refine abelian.pseudoelement.epi_of_pseudo_surjective _ (λ y, _),
+    refine is_snake_input.exists_of_exact (is_snake_input.long_row₃_exact D.is_snake_input) y _,
+    simp [is_snake_input.bottom_right_to_coker_row₂,
+          limits.cokernel.π_of_epi ((2, 1) ⟶[D] (2, 2))]
+  end,
+  exact_seq.cons _ _ h2 _
+    (exact_seq.cons _ _ (to_zero_exact_of_epi _ _ h3) _
+      (exact_seq.single _))
+
+end snake_diagram
+
+lemma coker_right_exact {V : Type*} [category V] [abelian V]
+  {A B C X Y Z : V}
+  (f : A ⟶ B) (g : B ⟶ C) (f' : X ⟶ Y) (g' : Y ⟶ Z)
+  (α : A ⟶ X) (β : B ⟶ Y) (γ : C ⟶ Z)
+  (w1 : f ≫ β = α ≫ f') (w2 : g ≫ γ = β ≫ g')
+  (H : short_exact f g) (H' : short_exact f' g')
+  : exact_seq V [((coker_functor V).map (arrow.hom_mk w1 : arrow.mk α ⟶ arrow.mk β)),
+                 ((coker_functor V).map (arrow.hom_mk w2 : arrow.mk β ⟶ arrow.mk γ)),
+                 (0 : cokernel γ ⟶ 0)] :=
+begin
+  letI := H.mono, letI := H.epi, letI := H'.mono, letI := H'.epi, 
+  convert cokernel_sequence (snake.mk_of_sequence_hom A B C X Y Z f g α β γ f' g'
+                                                      w1.symm w2.symm H.exact H'.exact).snake_input _;
+  dsimp [coker_functor, snake.snake_input, snake.snake_diagram, snake_diagram.mk_functor,
+         snake_diagram.mk_functor.map'];
+  simp only [category_theory.functor.map_id, category.id_comp, category.comp_id],
+  { refl }, { refl },
+  { exact H'.epi }
+end
+
+lemma right_exact_of_sends_SES_to_right_exact 
+  {V W : Type*} [category V] [category W] [abelian V] [abelian W]
+  (F : V ⥤ W) [F.additive]
+  (hF : ∀ {X Y Z} (f : X ⟶ Y) (g : Y ⟶ Z) [mono f] [epi g],
+          exact f g → exact (F.map f) (F.map g) ∧ epi (F.map g))
+  {X Y Z} (f : X ⟶ Y) (g : Y ⟶ Z) [epi g] (H : exact f g)
+  : exact (F.map f) (F.map g) ∧ epi (F.map g) :=
+  have preserves_epi : ∀ {P Q} (s : P ⟶ Q) [epi s], epi (F.map s) :=
+    λ P Q s hs, (@hF _ _ _ (kernel.ι s) s _ hs (snake_diagram.exact_kernel_ι_self s)).right,
+  have H' : image.ι f ≫ g = 0,
+  by { apply (factor_thru_image.category_theory.epi f).left_cancellation, simp, exact H.w },
+  have H'' : exact (image.ι f) g,
+  from ⟨H', by { have h1 := H.epi,
+                rw ← subobject_of_le_as_image_to_kernel _ _ H.w (image_le_kernel _ _ H.w) at h1,
+                rw ← subobject_of_le_as_image_to_kernel _ _ H' (image_le_kernel _ _ H'),
+                have h2 : image_subobject f ≤ image_subobject (image.ι f),
+                { transitivity image_subobject (factor_thru_image f ≫ image.ι f),
+                  { apply le_of_eq, symmetry, congr, apply image.fac },
+                  { apply image_subobject_comp_le } },
+                rw ← category_theory.subobject.of_le_comp_of_le _ _ _ h2 (image_le_kernel _ _ H') at h1,
+                refine @epi_of_epi _ _ _ _ _ _ _ h1 }⟩,
+  by { have := hF (image.ι f) g H'', refine ⟨_, this.right⟩,
+        rw ← image.fac f,
+        rw F.map_comp,
+        refine (@abelian.exact_epi_comp_iff _ _ _ _ _ _ _ _ _ _
+                                            (preserves_epi (factor_thru_image f))).mpr this.left }
+
+lemma any_coker_of_isos_is_iso {V : Type*} [category V] [abelian V]
+  {A B C X Y Z : V} (f : A ⟶ B) (g : B ⟶ C) (f' : X ⟶ Y) (g' : Y ⟶ Z)
+  (α : A ⟶ X) (β : B ⟶ Y) (γ : C ⟶ Z)
+  (h1 : exact_seq V [f, g, (0 : C ⟶ 0)]) (h2 : exact_seq V [f', g', (0 : Z ⟶ 0)])
+  (sq1 : α ≫ f' = f ≫ β) (sq2 : β ≫ g' = g ≫ γ)
+  (hα : is_iso α) (hβ : is_iso β) : is_iso γ :=
+begin
+  -- One can do this very concretely but I don't want to l m a o
+  have sq3 : γ ≫ (0 : _ ⟶ 0) = (0 : _ ⟶ 0) ≫ (0 : 0 ⟶ 0), { simp },
+  have sq4 : (0 : (0 : V) ⟶ 0) ≫ (0 : 0 ⟶ 0) = (0 : 0 ⟶ 0) ≫ 0 := rfl,
+  refine abelian.is_iso_of_is_iso_of_is_iso_of_is_iso_of_is_iso sq1 sq2 sq3 sq4 _ _ _ _ _ _,
+  { exact (exact_iff_exact_seq _ _).mpr (h1.extract 0 2) },
+  { exact (exact_iff_exact_seq _ _).mpr (h1.extract 1 3) },
+  { apply to_zero_exact_of_epi, apply_instance },
+  { exact (exact_iff_exact_seq _ _).mpr (h2.extract 0 2) },
+  { exact (exact_iff_exact_seq _ _).mpr (h2.extract 1 3) },
+  { apply to_zero_exact_of_epi, apply_instance }
+end
+
 section general_abelian_category
 
 universes u u' v v'
@@ -52,11 +180,11 @@ lemma homology_at_ith_index_zero
   {X Y : homological_complex V c} (f : X ⟶ Y) (i : ι) (H : f.f i = 0)
   : (homology_functor V c i).map f = 0 :=
 begin
-  ext, simp,
-  suffices : kernel_subobject_map (homological_complex.hom.sq_from f i) = 0,
-  { rw this, simp },
-  ext, simp,
-  rw H, simp
+  dsimp [homology_functor, homology.map],
+  convert cokernel.desc_zero _,
+  { convert zero_comp, dsimp [hom.sq_from, kernel_subobject_map], simp_rw [H, comp_zero],
+    exact subobject.factor_thru_zero _ },
+  exact comp_zero
 end
 
 def homological_complex_functor.mk_nat_trans [has_zero_morphisms V]
@@ -88,8 +216,7 @@ structure natural_chain_homotopy [preadditive V]
 -- parallel_pair_comp is an equality between two functors
 -- and that constrains them to be in the same universe
 protected def parallel_pair_comp_has_colim 
-  {V : Type*} [category V] {ι : Type} {c : complex_shape ι}
-  [has_zero_morphisms V] [has_cokernels V]
+ [has_zero_morphisms V] [has_cokernels V]
   {X Y : homological_complex V c} (f : X ⟶ Y) (p : ι)
   : has_colimit (parallel_pair f 0 ⋙ eval V c p) := by {
     rw parallel_pair_comp, dsimp, apply_instance
@@ -198,7 +325,201 @@ def chain_homotopy_on_coker_of_compatible_chain_homotopies
                  simp,
                  exact congr_arg _ (category.id_comp _),
                  delta cofork.π coker_of_chain_map_at parallel_pair_comp.cocone_comp_to_cocone_pair,
-                 simp, } } }
+                 simp, } } }.
+
+-- I should not have to do any of this...
+noncomputable
+instance [abelian V] (ℓ : ι) : preserves_finite_limits (eval V c ℓ) := 
+begin
+  constructor,
+  intros J j1 j2,
+  have : @has_limits_of_shape J j1 V _,
+  { obtain ⟨H⟩ := @abelian.has_finite_limits V _ _,
+    exact @H J j1 j2 },
+  refine @eval.category_theory.limits.preserves_limits_of_shape V _ J j1 ι c _ this ℓ,
+end
+
+noncomputable
+instance [abelian V] (ℓ : ι) : preserves_finite_colimits (eval V c ℓ) := 
+begin
+  constructor,
+  intros J j1 j2,
+  have : @has_colimits_of_shape J j1 V _,
+  { obtain ⟨H⟩ := @abelian.has_finite_colimits V _ _,
+    exact @H J j1 j2 },
+  refine @eval.category_theory.limits.preserves_colimits_of_shape V _ J j1 ι c _ this ℓ,
+end
+
+def coker_functor_degreewise_SES [abelian V]
+  {A X : homological_complex V c} (i : A ⟶ X) [mono i]
+  : ∀ ℓ, short_exact (i.f ℓ)
+                     (((coker_functor_proj (homological_complex V c)).app (arrow.mk i)).f ℓ) :=
+begin
+  intro,
+  rw [ ← homological_complex.eval_map, ← homological_complex.eval_map],
+  apply category_theory.functor.map_short_exact,
+  dsimp [coker_functor_proj],
+  refine short_exact.mk _,
+  apply snake_diagram.exact_self_cokernel_π
+end
+
+lemma δ_natural' [abelian V]  
+  {A B C X Y Z : homological_complex V c}
+  (f : A ⟶ B) (g : B ⟶ C) (f' : X ⟶ Y) (g' : Y ⟶ Z)
+  (α : A ⟶ X) (β : B ⟶ Y) (γ : C ⟶ Z)
+  (H1 : ∀ p, short_exact (f.f p)  (g.f p))
+  (H2 : ∀ p, short_exact (f'.f p) (g'.f p))
+  (w1 : f ≫ β = α ≫ f') (w2 : g ≫ γ = β ≫ g') 
+  (p q : ι) (hpq : c.rel p q) :
+  δ f g H1 p q hpq ≫ (homology_functor _ _ q).map α =
+    (homology_functor _ _ p).map γ ≫ δ f' g' H2 p q hpq :=
+  let α' : walking_arrow ⥤ homological_complex V c :=
+          arrow_category_iso_functor_category.hom.obj (arrow.mk α),
+      β' : walking_arrow ⥤ homological_complex V c :=
+          arrow_category_iso_functor_category.hom.obj (arrow.mk β),
+      γ' : walking_arrow ⥤ homological_complex V c :=
+          arrow_category_iso_functor_category.hom.obj (arrow.mk γ),
+      F : α' ⟶ β' := arrow_category_iso_functor_category.hom.map (arrow.hom_mk w1),
+      G : β' ⟶ γ' := arrow_category_iso_functor_category.hom.map (arrow.hom_mk w2) in
+  have H : Π (x : walking_arrow) ℓ, short_exact ((F.app x).f ℓ) ((G.app x).f ℓ),
+  by { intros, cases x, { exact H1 ℓ }, { exact H2 ℓ } },
+  by { have := δ_natural F G H walking_arrow_hom.arr p q hpq, exact this }
+
+noncomputable
+def homology_iso_cokernel [abelian V] (ℓ : ι) (h : c.next ℓ = none) (A : homological_complex V c)
+  : A.homology ℓ ≅ cokernel (A.d_to ℓ) :=
+{ hom := homology.desc' _ _ _ (kernel.ι _ ≫ cokernel.π _) $ by simp,
+  inv := cokernel.desc _ (homology.lift _ _ _ (cokernel.π _) $ by { simp, exact A.d_from_eq_zero h, })
+  $ begin
+    apply homology.hom_to_ext,
+    simp,
+  end,
+  hom_inv_id' := begin
+    apply homology.hom_from_ext,
+    apply homology.hom_to_ext,
+    simp,
+  end,
+  inv_hom_id' := begin
+    apply coequalizer.hom_ext,
+    simp,
+    let t := _, change _ ≫ t = _,
+    have ht : t = homology.ι _ _ _,
+    { apply homology.hom_from_ext, simp, },
+    simp [ht],
+  end }
+
+def homology_iso_cokernel_natural [abelian V] (ℓ : ι) (h : c.next ℓ = none)
+  {A B : homological_complex V c} (f : A ⟶ B) :
+  (homology_iso_cokernel ℓ h A).hom ≫ cokernel.map _ _ (f.prev _) (f.f _) (by simp) =
+  (homology_functor _ _ _).map f ≫ (homology_iso_cokernel ℓ h B).hom :=
+begin
+  dsimp [homology_iso_cokernel],
+  apply homology.hom_from_ext,
+  simp,
+end
+
+lemma mono_prev [abelian V] (ℓ : ι) {A B : homological_complex V c} (f : A ⟶ B)
+  (hf : ∀ m, mono (f.f m)) : mono (f.prev ℓ) :=
+begin
+  destruct (c.prev ℓ),
+  { intro h, have : A.X_prev ℓ = 0, { delta homological_complex.X_prev, rw h },
+    convert has_zero_object.category_theory.mono _,
+    swap, { exact (has_zero_object.unique_to _).default },
+    { apply heq_of_cast_eq _, swap, congr, exact this, apply (has_zero_object.unique_to _).uniq } },
+  { rintros ⟨m, h⟩ _, rw hom.prev_eq _ h, apply_instance }
+end
+
+lemma short_exact_prev [abelian V] (ℓ : ι) {A B C : homological_complex V c}
+  (f : A ⟶ B) (g : B ⟶ C) (h : ∀ m, short_exact (f.f m) (g.f m))
+  : short_exact (f.prev ℓ) (g.prev ℓ) :=
+  { mono := mono_prev ℓ f (λ m, (h m).mono),
+    exact := exact_prev' _ _ ℓ (λ m, (h m).exact),
+    epi := @homological_complex.epi_prev' _ _ _ _ _ _ _ _ _ (λ m, (h m).epi) }
+
+-- shouldn't need abelian, but we need the category of homological complexes to have images
+-- Suggests LTE has something messed up in its typeclasses
+lemma terminal_homology_right_exact [abelian V] (ℓ : ι) (hℓ : c.next ℓ = none)
+  {A B C : homological_complex V c}
+  (f : A ⟶ B) (g : B ⟶ C) (h : ∀ m, short_exact (f.f m) (g.f m))
+  : exact_seq V [(homology_functor V c ℓ).map f, (homology_functor V c ℓ).map g,
+                 (0 : C.homology ℓ ⟶ 0)] :=
+begin
+  have := coker_right_exact (f.prev ℓ) (g.prev ℓ) (f.f ℓ) (g.f ℓ)
+                            (A.d_to ℓ) (B.d_to ℓ) (C.d_to ℓ) (f.comm_to ℓ) (g.comm_to ℓ)
+                            (short_exact_prev ℓ f g h) (h ℓ),
+  constructor,
+  { replace this := this.extract 0 2, dsimp [list.extract] at this,
+    rw ← exact_iff_exact_seq at this,
+    refine preadditive.exact_of_iso_of_exact' _ _ _ _ (homology_iso_cokernel ℓ hℓ A).symm
+                                                      (homology_iso_cokernel ℓ hℓ B).symm
+                                                      (homology_iso_cokernel ℓ hℓ C).symm _ _ this;
+    { rw [iso.symm_hom, iso.symm_hom, iso.eq_comp_inv, category.assoc, iso.inv_comp_eq],
+      symmetry, apply homology_iso_cokernel_natural } },
+  { rw ← exact_iff_exact_seq,
+    replace this := this.extract 1 3, dsimp [list.extract] at this,
+    rw ← exact_iff_exact_seq at this,
+    refine preadditive.exact_of_iso_of_exact' _ _ _ _ (homology_iso_cokernel ℓ hℓ B).symm
+                                                      (homology_iso_cokernel ℓ hℓ C).symm
+                                                      (iso.refl 0) _ _ this,
+    { rw [iso.symm_hom, iso.symm_hom, iso.eq_comp_inv, category.assoc, iso.inv_comp_eq],
+      symmetry, apply homology_iso_cokernel_natural },
+    { simp } }
+end
+
+lemma coker_of_quasi_isos_between_monic_arrows_is_quasi_iso [abelian V]
+  {A B X Y : homological_complex V c}
+  (i : A ⟶ X) (j : B ⟶ Y)
+  (hi : mono i) (hj : mono j)
+  (g : A ⟶ B) (f : X ⟶ Y)
+  (hg : quasi_iso g) (hf : quasi_iso f)
+  (w : g ≫ j = i ≫ f)
+  : quasi_iso ((coker_functor (homological_complex V c)).map (arrow.hom_mk w : arrow.mk i ⟶ arrow.mk j)) :=
+begin
+  constructor, intro ℓ,
+  have sq1 := eq.trans (eq.symm ((homology_functor V c ℓ).map_comp' g j))
+                       (eq.trans (congr_arg _ w) ((homology_functor V c ℓ).map_comp' i f)), 
+  have sq2 : (homology_functor V c ℓ).map f
+           ≫ (homology_functor V c ℓ).map ((coker_functor_proj (homological_complex V c)).app (arrow.mk j))
+           = (homology_functor V c ℓ).map ((coker_functor_proj (homological_complex V c)).app (arrow.mk i))
+           ≫ (homology_functor V c ℓ).map ((coker_functor _).map (arrow.hom_mk w : arrow.mk i ⟶ arrow.mk j)),
+  { rw [← functor.map_comp, ← functor.map_comp], apply congr_arg,
+    exact ((coker_functor_proj (homological_complex V c)).naturality' (arrow.hom_mk w : arrow.mk i ⟶ arrow.mk j)) },
+  destruct (c.next ℓ),
+  { intro h,
+    have H := terminal_homology_right_exact ℓ h i
+                ((coker_functor_proj (homological_complex V c)).app (arrow.mk i))
+                (coker_functor_degreewise_SES i),
+    have H' := terminal_homology_right_exact ℓ h j
+                 ((coker_functor_proj (homological_complex V c)).app (arrow.mk j))
+                 (coker_functor_degreewise_SES j),
+    exact any_coker_of_isos_is_iso _ _ _ _
+                                   ((homology_functor V c ℓ).map g)
+                                   ((homology_functor V c ℓ).map f)
+                                   ((homology_functor V c ℓ).map ((coker_functor _).map (arrow.hom_mk w : arrow.mk i ⟶ arrow.mk j)))
+                                   H H' sq1 sq2 (quasi_iso.is_iso ℓ) (quasi_iso.is_iso ℓ) },
+  { rintros ⟨m, hm⟩ _, 
+    have sq3 := (δ_natural' i ((coker_functor_proj (homological_complex V c)).app (arrow.mk i))
+                            j ((coker_functor_proj (homological_complex V c)).app (arrow.mk j))
+                            g f
+                            ((coker_functor _).map (arrow.hom_mk w : arrow.mk i ⟶ arrow.mk j))
+                            (coker_functor_degreewise_SES i)
+                            (coker_functor_degreewise_SES j) w.symm
+                            ((coker_functor_proj (homological_complex V c)).naturality' _).symm
+                            ℓ m hm).symm,
+    have sq4 := eq.trans (eq.symm ((homology_functor V c m).map_comp' g j))
+                         (eq.trans (congr_arg _ w) ((homology_functor V c m).map_comp' i f)),
+    have LES1 := six_term_exact_seq i ((coker_functor_proj (homological_complex V c)).app (arrow.mk i))
+                                     (coker_functor_degreewise_SES i) ℓ m hm,
+    have LES2 := six_term_exact_seq j ((coker_functor_proj (homological_complex V c)).app (arrow.mk j))
+                                      (coker_functor_degreewise_SES j) ℓ m hm,
+    refine abelian.is_iso_of_is_iso_of_is_iso_of_is_iso_of_is_iso sq1 sq2 sq3 sq4 _ _ _ _ _ _,
+    { exact (exact_iff_exact_seq _ _).mpr (LES1.extract 0 2) },
+    { exact (exact_iff_exact_seq _ _).mpr (LES1.extract 1 2) },
+    { exact (exact_iff_exact_seq _ _).mpr (LES1.extract 2 2) },
+    { exact (exact_iff_exact_seq _ _).mpr (LES2.extract 0 2) },
+    { exact (exact_iff_exact_seq _ _).mpr (LES2.extract 1 2) },
+    { exact (exact_iff_exact_seq _ _).mpr (LES2.extract 2 2) } }
+end
 
 end general_abelian_category
 
@@ -342,9 +663,9 @@ lemma Module.to_homology_comp_homology_functor_map
         (by intros; simp))
   ≫ Module.as_hom_right (is_linear_map.mk' Module.to_homology
                                            (Module.to_homology.homomorphism Y i)) :=
-begin
-  ext, cases x, simp [Module.as_hom_right], delta Module.to_homology, congr,
-  transitivity, apply Module.cycles_map_to_cycles, refl
+begin 
+  apply linear_map.ext, intros x, cases x, simp [Module.as_hom_right], delta Module.to_homology,
+  congr, transitivity, apply Module.cycles_map_to_cycles, refl
 end
 
 -- The version in mathlib fixed v' to be v for some reason
@@ -426,7 +747,7 @@ lemma Module.homology_ext''
        ∃ (j : ι) (y : D.X j), h.f i x = k.f i x + D.d j i y)
   : (homology_functor (Module.{v'} R) c i).map h = (homology_functor (Module.{v'} R) c i).map k :=
 begin
-  ext, cases x with x hx,
+  apply Module.homology_ext', intro x, cases x with x hx,
   rw [homology_functor_map, homology_functor_map, homology.π_map_apply, homology.π_map_apply],
   delta kernel_subobject_map, dsimp [hom.sq_from],
   rw [Module.cycles_map_to_cycles, Module.cycles_map_to_cycles],
@@ -801,7 +1122,7 @@ begin
   { let f' := linear_equiv.of_bijective _ this.left this.right,
     constructor,
     refine exists.intro f'.symm _,
-    split; ext, { apply f'.left_inv }, { apply f'.right_inv } },
+    split; apply Module.homology_ext'; intro, { apply f'.left_inv }, { apply f'.right_inv } },
   split,
   { rw [← linear_map.ker_eq_bot, linear_map.ker_eq_bot'],
     intros x hx,

@@ -279,7 +279,7 @@ lemma lift_nat_trans_spec
   (ϕ : (F ⋙ homology_functor (Module R) _ 0) ⟶ (G ⋙ homology_functor (Module R) _ 0))
   : whisker_right (lift_nat_trans b G H_acyclic ϕ) (homology_functor (Module R) _ 0) = ϕ := 
 begin
-  ext X x, cases x with x h,
+  apply nat_trans.ext, funext, apply Module.homology_ext', rintro ⟨x, h⟩,
   rw ← lift_nat_trans_deg0_is_lift b G ϕ X x h (by simp),
   delta Module.to_homology, simp,
   refine congr_arg _ _,
