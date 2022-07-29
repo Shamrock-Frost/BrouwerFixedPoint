@@ -40,8 +40,8 @@ end
 -- end
 
 noncomputable
-def spanned_by_sat_basis (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid M] [module R M]
-                         {ι : Type*} (b : basis ι R M) (s : set ι)
+def spanned_by_sat_basis (R : Type u) [comm_ring R] (M : Type w) [add_comm_monoid M] [module R M]
+                         {ι : Type p} (b : basis ι R M) (s : set ι)
                          : basis s R (spanned_by_sat R M b s) := {
   repr := {
     to_fun := λ x, @finsupp.lsubtype_domain ι R R _ _ _ s (b.repr x),
@@ -78,7 +78,7 @@ def spanned_by_sat_basis (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid 
 }
 
 lemma spanned_by_sat_basis_apply (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid M] [module R M]
-                                 {ι : Type*} (b : basis ι R M) (s : set ι)
+                                 {ι : Type p} (b : basis ι R M) (s : set ι)
                                  (i : ι) (hi : i ∈ s)
                                  : spanned_by_sat_basis R M b s ⟨i, hi⟩
                                  = ⟨b i, submodule.subset_span (set.mem_image_of_mem b hi)⟩ :=
@@ -86,7 +86,7 @@ begin
   apply subtype.eq, simp [spanned_by_sat_basis]
 end
 
-def subcomplex_spanned_by (R : Type u) [comm_ring R] {ι' : Type} {c : complex_shape ι'}
+def subcomplex_spanned_by (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}
                           (C : homological_complex (Module.{w} R) c)
                           {ι : ι' → Type p} (b : Π (i : ι'), basis (ι i) R (C.X i))
                           (s : Π (i : ι'), set (ι i))
@@ -102,7 +102,7 @@ def subcomplex_spanned_by (R : Type u) [comm_ring R] {ι' : Type} {c : complex_s
                                                                           { rw C.shape' i j h, simp } })
 
 def subcomplex_spanned_by_map
-  (R : Type u) [comm_ring R] {ι' : Type} {c : complex_shape ι'}
+  (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}
   (C1 C2 : homological_complex (Module.{w} R) c)
   (f : C1 ⟶ C2)
   {ι1 ι2 : ι' → Type p}
@@ -127,7 +127,69 @@ def subcomplex_spanned_by_map
                   dsimp [subcomplex_spanned_by, Module.subcomplex_of_compatible_submodules],
                   rw ← category_theory.comp_apply _ (f.f j),
                   rw ← f.comm' i j hij, refl }
-  }
+  }.
+
+def subcomplex_spanned_by_map_inj
+  (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}
+  (C1 C2 : homological_complex (Module.{w} R) c)
+  (f : C1 ⟶ C2)
+  {ι1 ι2 : ι' → Type p}
+  (b1 : Π (i : ι'), basis (ι1 i) R (C1.X i))
+  (b2 : Π (i : ι'), basis (ι2 i) R (C2.X i))
+  (s1 : Π (i : ι'), set (ι1 i)) (s2 : Π (i : ι'), set (ι2 i))
+  (s1_mono : Π i j, c.rel i j →
+    submodule.map (C1.d i j) (spanned_by_sat R (C1.X i) (b1 i) (s1 i))
+    ≤ spanned_by_sat R (C1.X j) (b1 j) (s1 j))
+  (s2_mono : Π i j, c.rel i j →
+    submodule.map (C2.d i j) (spanned_by_sat R (C2.X i) (b2 i) (s2 i))
+    ≤ spanned_by_sat R (C2.X j) (b2 j) (s2 j))
+  (hcompat : ∀ i ℓ, ℓ ∈ s1 i → f.f i (b1 i ℓ) ∈ (spanned_by_sat R (C2.X i) (b2 i) (s2 i)))
+  (hinj : ∀ n, function.injective (f.f n))
+  : ∀ n, function.injective ((subcomplex_spanned_by_map R C1 C2 f b1 b2 s1 s2 s1_mono s2_mono hcompat).f n) :=
+begin
+  rintros n ⟨x, hx⟩ ⟨y, hy⟩ hxy,
+  apply subtype.eq, change x = y,
+  refine @hinj n x y _,
+  have := congr_arg subtype.val hxy,
+  exact this
+end
+
+def subcomplex_spanned_by_map_comp
+  (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}
+  (C1 C2 C3 : homological_complex (Module.{w} R) c)
+  (f : C1 ⟶ C2) (g : C2 ⟶ C3) 
+  {ι1 ι2 ι3 : ι' → Type p}
+  (b1 : Π (i : ι'), basis (ι1 i) R (C1.X i))
+  (b2 : Π (i : ι'), basis (ι2 i) R (C2.X i))
+  (b3 : Π (i : ι'), basis (ι3 i) R (C3.X i))
+  (s1 : Π (i : ι'), set (ι1 i)) (s2 : Π (i : ι'), set (ι2 i)) (s3 : Π (i : ι'), set (ι3 i))
+  (s1_mono : Π i j, c.rel i j →
+    submodule.map (C1.d i j) (spanned_by_sat R (C1.X i) (b1 i) (s1 i))
+    ≤ spanned_by_sat R (C1.X j) (b1 j) (s1 j))
+  (s2_mono : Π i j, c.rel i j →
+    submodule.map (C2.d i j) (spanned_by_sat R (C2.X i) (b2 i) (s2 i))
+    ≤ spanned_by_sat R (C2.X j) (b2 j) (s2 j))
+  (s3_mono : Π i j, c.rel i j →
+    submodule.map (C3.d i j) (spanned_by_sat R (C3.X i) (b3 i) (s3 i))
+    ≤ spanned_by_sat R (C3.X j) (b3 j) (s3 j))
+  (h12 : ∀ i ℓ, ℓ ∈ s1 i → f.f i (b1 i ℓ) ∈ (spanned_by_sat R (C2.X i) (b2 i) (s2 i)))
+  (h23 : ∀ i ℓ, ℓ ∈ s2 i → g.f i (b2 i ℓ) ∈ (spanned_by_sat R (C3.X i) (b3 i) (s3 i)))
+  : subcomplex_spanned_by_map R C1 C2 f b1 b2 s1 s2 s1_mono s2_mono h12 
+  ≫ subcomplex_spanned_by_map R C2 C3 g b2 b3 s2 s3 s2_mono s3_mono h23
+  = subcomplex_spanned_by_map R C1 C3 (f ≫ g) b1 b3 s1 s3 s1_mono s3_mono
+                              (λ i ℓ hℓ, (submodule.map_span_le (g.f i) _ (spanned_by_sat R (C3.X i) (b3 i) (s3 i))).mpr
+                                           (λ y (hy : y ∈ (b2 i) '' (s2 i)), exists.elim hy (λ m hm, eq.subst hm.right (h23 i m hm.left)))
+                                           (set.mem_image_of_mem _ (h12 i ℓ hℓ))
+                              : ∀ i ℓ, ℓ ∈ s1 i → g.f i (f.f i (b1 i ℓ))
+                                                 ∈ (spanned_by_sat R (C3.X i) (b3 i) (s3 i))) :=
+begin
+  ext n : 2, 
+  apply basis.ext (spanned_by_sat_basis R (C1.X n) (b1 n) (s1 n)),
+  rintro ⟨i, hi⟩,
+  rw spanned_by_sat_basis_apply,
+  apply subtype.eq,
+  refl,
+end
 
 end subcomplexes_with_indexing
 
@@ -182,6 +244,21 @@ def bounded_by_subcomplex (R : Type*) [comm_ring R] {X : Top} (cov : set (set X)
                            (λ n, λ p, ∃ s, s ∈ cov ∧ set.range p.2 ⊆ s)
                            (λ i j hij, bounded_by_subcomplex_compat R cov i j)
 
+lemma bounded_by_subcomplex_eq_bounded_by_submodule (R : Type*) [comm_ring R] {X : Top}
+  (cov : set (set X)) (n : ℕ)
+  : (bounded_by_subcomplex R cov).X n = Module.of R (bounded_by_submodule R cov n) := rfl
+
+lemma bounded_by_submodule_refinement (R : Type) [comm_ring R] {X : Top} (cov cov' : set (set X))
+  (h : ∀ s, s ∈ cov → ∃ s', s' ∈ cov' ∧ s ⊆ s') (n : ℕ)
+  : bounded_by_submodule R cov n ≤ bounded_by_submodule R cov' n :=
+begin
+  refine submodule.span_mono _,
+  apply set.image_subset,
+  rintros ⟨i, σ⟩ ⟨s, hs1, hs2⟩,
+  obtain ⟨t, ht, hst⟩ := h s hs1,
+  exact ⟨t, ht, subset_trans hs2 hst⟩
+end
+
 -- handles both intersecting a cover with a subset and refining covers!
 noncomputable
 def bounded_by_subcomplex_map (R : Type) [comm_ring R] {X Y : Top} (f : X ⟶ Y)
@@ -199,19 +276,31 @@ def bounded_by_subcomplex_map (R : Type) [comm_ring R] {X Y : Top} (f : X ⟶ Y)
                                    (subset_trans (set.image_subset f hσ) hst)⟩ },
       { rw ← simplex_to_chain_is_basis, refl } })
 
-lemma bounded_by_subcomplex_eq_bounded_by_submodule (R : Type*) [comm_ring R] {X : Top}
-  (cov : set (set X)) (n : ℕ)
-  : (bounded_by_subcomplex R cov).X n = Module.of R (bounded_by_submodule R cov n) := rfl
-
-lemma bounded_by_submodule_refinement (R : Type) [comm_ring R] {X : Top} (cov cov' : set (set X))
-  (h : ∀ s, s ∈ cov → ∃ s', s' ∈ cov' ∧ s ⊆ s') (n : ℕ)
-  : bounded_by_submodule R cov n ≤ bounded_by_submodule R cov' n :=
+lemma bounded_by_subcomplex_map_comp (R : Type) [comm_ring R] {X Y Z : Top}
+  (f : X ⟶ Y) (g : Y ⟶ Z) (covX : set (set X)) (covY : set (set Y)) (covZ : set (set Z))
+  (H  : ∀ s, s ∈ covX → ∃ t, t ∈ covY ∧ f '' s ⊆ t)
+  (H' : ∀ t, t ∈ covY → ∃ u, u ∈ covZ ∧ g '' t ⊆ u)
+  : bounded_by_subcomplex_map R f covX covY H ≫ bounded_by_subcomplex_map R g covY covZ H'
+  = bounded_by_subcomplex_map R (f ≫ g) covX covZ (λ s hs, exists.elim (H s hs) (λ t ht,
+    exists.elim (H' t ht.left) (λ u hu, ⟨u, hu.left, subset_trans (subset_of_eq (set.image_comp g f s))
+                                                                 (subset_trans (set.image_subset g ht.right) hu.right)⟩))) :=
 begin
-  refine submodule.span_mono _,
-  apply set.image_subset,
-  rintros ⟨i, σ⟩ ⟨s, hs1, hs2⟩,
-  obtain ⟨t, ht, hst⟩ := h s hs1,
-  exact ⟨t, ht, subset_trans hs2 hst⟩
+  delta bounded_by_subcomplex_map,
+  rw subcomplex_spanned_by_map_comp,
+  congr,
+  symmetry, apply (singular_chain_complex R).map_comp
+end
+
+lemma bounded_by_subcomplex_map_mono (R : Type) [comm_ring R] {X Y : Top}
+  (f : X ⟶ Y) (hf : function.injective f) (covX : set (set X)) (covY : set (set Y))
+  (H  : ∀ s, s ∈ covX → ∃ t, t ∈ covY ∧ f '' s ⊆ t)
+  : category_theory.mono (bounded_by_subcomplex_map R f covX covY H) :=
+begin
+  apply_with homological_complex.mono_of_eval {instances := ff},
+  intro, rw Module.mono_iff_injective,
+  delta bounded_by_subcomplex_map, apply subcomplex_spanned_by_map_inj,
+  apply singular_chain_complex_map_inj,
+  exact hf
 end
 
 noncomputable
@@ -1586,3 +1675,466 @@ begin
   rw spanned_by_sat_basis_apply,
   refl
 end
+
+noncomputable
+def bounded_by_pullback_chain_inclusion (R : Type) [comm_ring R] 
+  (i : category_theory.arrow Top) (cov : set (set i.right))
+  : bounded_by_subcomplex R (pullback_family_of_sets cov (i.hom)) ⟶ bounded_by_subcomplex R cov :=
+  bounded_by_subcomplex_map R i.hom (pullback_family_of_sets cov i.hom)
+                                                                     cov
+                                                                     (λ s hs, exists.elim hs (λ t ht, ⟨t, ht.left, 
+  subset_trans (set.image_subset _ (subset_of_eq ht.right.symm)) (set.image_preimage_subset _ _)⟩)).
+
+lemma pullback_of_refinement_is_refinement (R : Type) [comm_ring R]
+  {X A Y B : Top} (i : A ⟶ X) (j : B ⟶ Y)
+  (g : A ⟶ B) (f : X ⟶ Y) (w : g ≫ j = i ≫ f)
+  (cov : set (set X)) (cov' : set (set Y)) (H : ∀ S, S ∈ cov → ∃ T, T ∈ cov' ∧ f '' S ⊆ T)
+  : ∀ s, s ∈ pullback_family_of_sets cov i → ∃ t, t ∈ pullback_family_of_sets cov' j ∧ g '' s ⊆ t :=
+begin
+  rintros s ⟨S, hS, hs⟩,
+  obtain ⟨T, hT⟩ := H S hS,
+  refine ⟨j ⁻¹' T, set.mem_image_of_mem _ hT.left, _⟩, 
+  refine set.image_subset_iff.mp _,
+  refine subset_trans _ hT.right,
+  rw [← set.image_comp, ← hs],
+  change (g ≫ j) '' (i ⁻¹' S) ⊆ f '' S,
+  rw w,  refine subset_trans (subset_of_eq (set.image_comp f i _)) _,
+  dsimp, 
+  refine set.image_subset _ _,
+  exact set.image_preimage_subset _ _ 
+end
+
+lemma bounded_by_pullback_chain_inclusion_natural(R : Type) [comm_ring R] 
+  (i : category_theory.arrow Top) (j : category_theory.arrow Top) (w : i ⟶ j)
+  (cov : set (set i.right)) (cov' : set (set j.right))
+  (H : ∀ S, S ∈ cov → ∃ T, T ∈ cov' ∧ w.right '' S ⊆ T)
+  : bounded_by_subcomplex_map R w.left (pullback_family_of_sets cov  i.hom)
+                                       (pullback_family_of_sets cov' j.hom)
+                                       (pullback_of_refinement_is_refinement R i.hom j.hom w.left 
+                                                                             w.right w.w cov cov' H)
+    ≫ bounded_by_pullback_chain_inclusion R j cov'
+    = bounded_by_pullback_chain_inclusion R i cov ≫ bounded_by_subcomplex_map R w.right cov cov' H :=
+begin
+  delta bounded_by_pullback_chain_inclusion,
+  rw [bounded_by_subcomplex_map_comp, bounded_by_subcomplex_map_comp],
+  have := w.w, dsimp at this, simp_rw this,
+  refl
+end
+
+noncomputable
+def singular_chain_complex_of_pair_under_cover (R : Type) [comm_ring R] 
+  (i : category_theory.arrow Top) (cov : set (set i.right)) : chain_complex (Module R) ℕ :=
+  category_theory.limits.cokernel (bounded_by_pullback_chain_inclusion R i cov).
+
+noncomputable
+def singular_chain_complex_of_pair_under_cover_map (R : Type) [comm_ring R] 
+  {i j : category_theory.arrow Top} (w : i ⟶ j)
+  (cov : set (set i.right)) (cov' : set (set j.right)) 
+  (H : ∀ s, s ∈ cov → ∃ t, t ∈ cov' ∧ w.right '' s ⊆ t)
+  : singular_chain_complex_of_pair_under_cover R i cov
+  ⟶ singular_chain_complex_of_pair_under_cover R j cov' :=
+  (coker_functor (chain_complex (Module R) ℕ)).map
+    (category_theory.arrow.hom_mk (bounded_by_pullback_chain_inclusion_natural R i j w cov cov' H)
+    : category_theory.arrow.mk (bounded_by_pullback_chain_inclusion R i cov)
+    ⟶ category_theory.arrow.mk (bounded_by_pullback_chain_inclusion R j cov'))
+
+noncomputable
+def singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair 
+  (R : Type) [comm_ring R] (i : category_theory.arrow Top) (cov : set (set i.right))
+  : singular_chain_complex_of_pair_under_cover R i cov ⟶ (singular_chain_complex_of_pair R).obj i :=
+  (coker_functor (chain_complex (Module R) ℕ)).map
+    (category_theory.arrow.hom_mk (cover_inclusion_natural R i.hom
+                                    (pullback_family_of_sets cov i.hom) cov
+                                    (λ s hs, exists.elim hs (λ t ht, ⟨t, ht.left, 
+                                    subset_trans (set.image_subset _ (subset_of_eq ht.right.symm))
+                                                 (set.image_preimage_subset _ _)⟩)))
+    : category_theory.arrow.mk _ ⟶ category_theory.arrow.mk _)
+
+lemma singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair_naturality
+  (R : Type) [comm_ring R] {i j : category_theory.arrow Top} (w : i ⟶ j)
+  (cov : set (set i.right)) (cov' : set (set j.right)) 
+  (H : ∀ s, s ∈ cov → ∃ t, t ∈ cov' ∧ w.right '' s ⊆ t)
+  : singular_chain_complex_of_pair_under_cover_map R w cov cov' H
+  ≫ singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair R j cov'
+  = singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair R i cov
+  ≫ (singular_chain_complex_of_pair R).map w :=
+begin
+  dsimp [singular_chain_complex_of_pair, singular_chain_complex_of_pair_under_cover_map,
+         singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair],
+  rw [← (coker_functor (chain_complex (Module R) ℕ)).map_comp,
+      ← (coker_functor (chain_complex (Module R) ℕ)).map_comp],
+  refine congr_arg _ _,
+  ext : 1; dsimp; symmetry; apply cover_inclusion_natural,
+end
+
+noncomputable
+def singular_homology_of_pair_under_cover (R : Type) [comm_ring R] 
+  (i : category_theory.arrow Top) (cov : set (set i.right)) (n : ℕ) : Module R := 
+  (singular_chain_complex_of_pair_under_cover R i cov).homology n
+
+lemma singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair_quasi_iso
+  (R : Type) [comm_ring R] (i : category_theory.arrow Top) (hi : function.injective i.hom)
+  (cov : set (set i.right)) (cov_is_open : ∀ s, s ∈ cov → is_open s) (hcov : ⋃₀ cov = ⊤)
+  : quasi_iso (singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair R i cov) :=
+begin
+  apply coker_of_quasi_isos_between_monic_arrows_is_quasi_iso,
+  { apply bounded_by_subcomplex_map_mono, exact hi },
+  { apply_with homological_complex.mono_of_eval {instances := ff},
+    intro, rw Module.mono_iff_injective,
+    apply singular_chain_complex_map_inj, exact hi },
+  { apply cover_subcomplex_inclusion_quasi_iso,
+    { apply pullback_family_of_sets_by_continuous, assumption },
+    { apply pullback_family_of_sets_covers, assumption } },
+  { apply cover_subcomplex_inclusion_quasi_iso; assumption }
+end.
+
+def excision_inner_map {X : Type*} [topological_space X] (A B : set X)
+  : Top.of (A ∩ B : set X) ⟶ Top.of A := ⟨_, continuous_inclusion (set.inter_subset_left _ _)⟩
+
+def excision_outer_map {X : Type*} [topological_space X] (A B : set X)
+  : Top.of B ⟶ Top.of X := ⟨_, continuous_subtype_val⟩
+
+def excision_include {X : Type*} [topological_space X] (A : set X)
+  : Top.of A ⟶ Top.of X := ⟨_, continuous_subtype_val⟩
+
+def excision_include_inter {X : Type*} [topological_space X] (A B : set X)
+  : Top.of (A ∩ B : set X) ⟶ Top.of B :=
+  ⟨set.inclusion (set.inter_subset_right A B), continuous_inclusion (set.inter_subset_right A B)⟩
+
+lemma excision_sq_comm {X : Type*} [topological_space X] (A B : set X)
+  : excision_inner_map A B ≫ excision_include A
+  = excision_include_inter A B ≫ excision_outer_map A B := by { ext, refl }
+
+def excision_map {X : Type*} [topological_space X] (A B : set X)
+  : category_theory.arrow.mk (excision_inner_map A B)
+  ⟶ category_theory.arrow.mk (excision_outer_map A B) :=
+  category_theory.arrow.hom_mk (excision_sq_comm A B).symm
+
+lemma bounded_by_subcomplex_inclusion_iso_of_contains_univ (R : Type) [comm_ring R]
+  {X : Top} (cov : set (set X)) (h : set.univ ∈ cov)
+  : category_theory.is_iso (bounded_by_subcomplex_inclusion R cov) :=
+begin
+  apply homological_complex.is_iso_of_degreewise_is_iso, intro i, 
+  dsimp [bounded_by_subcomplex_inclusion, Module.subcomplex_of_compatible_submodules_inclusion],
+  refine category_theory.is_iso.of_iso (linear_equiv.to_Module_iso' (linear_equiv.of_bijective
+                ((bounded_by_subcomplex_inclusion R cov).f i) _ _)),
+  { exact submodule.injective_subtype _ },
+  { rw [← set.range_iff_surjective, ← linear_map.range_coe],
+    refine eq.trans (congr_arg _ _) submodule.top_coe, convert submodule.range_subtype _,
+    symmetry, rw eq_top_iff,
+    rw ← subset_subcomplex_univ,
+    refine subset_subcomplex_le_bounded_by_subcomplex R _ set.univ _ i,
+    exact h }
+end.
+
+-- move this to homological algebra
+lemma is_pullback_of_is_is_pullback_eval {V : Type*} [category_theory.category V]
+  [category_theory.limits.has_zero_morphisms V] {ι : Type*} {c : complex_shape ι}
+  {W X Y Z : homological_complex V c} (f : W ⟶ X) (g : W ⟶ Y) (h : X ⟶ Z) (i : Y ⟶ Z)
+  (H : ∀ n, category_theory.is_pullback (f.f n) (g.f n) (h.f n) (i.f n))
+  : category_theory.is_pullback f g h i :=
+begin
+  refine category_theory.is_pullback.of_is_limit' _ _,
+  { constructor, ext n, dsimp, exact (H n).to_comm_sq.w },
+  { apply homological_complex.is_limit_of_is_limit_eval, intro n,
+    have functors_eq : category_theory.limits.cospan h i ⋙ homological_complex.eval V c n
+                     = category_theory.limits.cospan (h.f n) (i.f n),
+    { refine category_theory.functor.hext _ _,
+      { intro ℓ, cases ℓ; try { cases ℓ }; refl },
+      { intros ℓ ℓ' a, cases a,
+        { cases ℓ; try { cases ℓ }; refl },
+        { cases a_1; refl } } },
+    convert (H n).is_limit,
+    { simp [category_theory.comm_sq.cone, category_theory.is_pullback.cone,
+            category_theory.functor.map_cone, category_theory.limits.cones.functoriality,
+            homological_complex.eval],
+      transitivity { category_theory.limits.cone .
+                     X := (category_theory.limits.pullback_cone.mk (f.f n) (g.f n) (H n).to_comm_sq.w).X,
+                     π := { app := (category_theory.limits.pullback_cone.mk (f.f n) (g.f n) (H n).to_comm_sq.w).π.app,
+                            naturality' := (category_theory.limits.pullback_cone.mk (f.f n) (g.f n) (H n).to_comm_sq.w).π.naturality' } },
+      { congr,
+        { assumption },
+        { assumption },
+        { ext, refl,
+          intros ℓ ℓ' hℓ, cases hℓ, 
+          cases ℓ; try { cases ℓ }; refl },
+        { apply proof_irrel_heq } },
+      { apply heq_of_eq, congr } } }
+end
+
+lemma is_pushout_of_is_is_pushout_eval {V : Type*} [category_theory.category V]
+  [category_theory.limits.has_zero_morphisms V] {ι : Type*} {c : complex_shape ι}
+  {W X Y Z : homological_complex V c} (f : W ⟶ X) (g : W ⟶ Y) (h : X ⟶ Z) (i : Y ⟶ Z)
+  (H : ∀ n, category_theory.is_pushout (f.f n) (g.f n) (h.f n) (i.f n))
+  : category_theory.is_pushout f g h i :=
+begin
+  refine category_theory.is_pushout.of_is_colimit' _ _,
+  { constructor, ext n, dsimp, exact (H n).to_comm_sq.w },
+  { apply homological_complex.is_colimit_of_is_colimit_eval, intro n,
+    have functors_eq : category_theory.limits.span f g ⋙ homological_complex.eval V c n
+                     = category_theory.limits.span (f.f n) (g.f n),
+    { refine category_theory.functor.hext _ _,
+      { intro ℓ, cases ℓ; try { cases ℓ }; refl },
+      { intros ℓ ℓ' a, cases a,
+        { cases ℓ; try { cases ℓ }; refl },
+        { cases a_1; refl } } },
+    convert (H n).is_colimit,
+    { simp [category_theory.comm_sq.cocone, category_theory.is_pushout.cocone,
+            category_theory.functor.map_cocone, category_theory.limits.cocones.functoriality,
+            homological_complex.eval],
+      transitivity { category_theory.limits.cocone .
+                     X := (category_theory.limits.pushout_cocone.mk (h.f n) (i.f n) (H n).to_comm_sq.w).X,
+                     ι := { app := (category_theory.limits.pushout_cocone.mk (h.f n) (i.f n) (H n).to_comm_sq.w).ι.app,
+                            naturality' := (category_theory.limits.pushout_cocone.mk (h.f n) (i.f n) (H n).to_comm_sq.w).ι.naturality' } },
+      { congr,
+        { assumption },
+        { assumption },
+        { ext, refl,
+          intros ℓ ℓ' hℓ, cases hℓ, 
+          cases ℓ; try { cases ℓ }; refl },
+        { apply proof_irrel_heq } },
+      { apply heq_of_eq, congr } } }
+end
+
+lemma Module.inter_is_pullback (R : Type*) [comm_ring R]
+  {X A B Y : Module R} {f : X ⟶ A} {g : X ⟶ B} {f' : A ⟶ Y} {g' : B ⟶ Y}
+  (U : Module R) (i : X ⟶ U) (j : A ⟶ U) (k : B ⟶ U) (ℓ : Y ⟶ U)
+  (hi : function.injective i) (hj : function.injective j)
+  (hk : function.injective k) (hℓ : function.injective ℓ)
+  (hf : f ≫ j = i) (hg : g ≫ k = i) (hf' : f' ≫ ℓ = j) (hg' : g' ≫ ℓ = k)
+  (H : linear_map.range i = linear_map.range j ⊓ linear_map.range k)
+  : category_theory.is_pullback f g f' g' :=
+begin
+  admit
+end
+
+lemma Module.sum_is_pushout (R : Type*) [comm_ring R]
+  {X A B Y : Module R} {f : X ⟶ A} {g : X ⟶ B} {f' : A ⟶ Y} {g' : B ⟶ Y}
+  (U : Module R) (i : X ⟶ U) (j : A ⟶ U) (k : B ⟶ U) (ℓ : Y ⟶ U)
+  (hi : function.injective i) (hj : function.injective j)
+  (hk : function.injective k) (hℓ : function.injective ℓ)
+  (hf : f ≫ j = i) (hg : g ≫ k = i) (hf' : f' ≫ ℓ = j) (hg' : g' ≫ ℓ = k)
+  (H  : linear_map.range i = linear_map.range j ⊓ linear_map.range k)
+  (H' : linear_map.range ℓ = linear_map.range j ⊔ linear_map.range k)
+  : category_theory.is_pushout f g f' g' :=
+begin
+  admit
+end
+
+lemma range_of_singular_chain_complex_include_subspace {X : Type*} [topological_space X]
+  (R : Type*) [comm_ring R] (S : set X) (cov : set (set S)) (n : ℕ)
+  : (linear_map.dom_restrict (((singular_chain_complex R).map (⟨subtype.val, continuous_subtype_val⟩ : Top.of S ⟶ Top.of X)).f n)
+                             (@bounded_by_submodule R _ (Top.of S) cov n)).range
+  = subset_submodule R X S n :=
+begin
+  transitivity submodule.map (((singular_chain_complex R).map (⟨subtype.val, continuous_subtype_val⟩ : Top.of S ⟶ Top.of X)).f n)
+                             (@bounded_by_submodule R _ (Top.of S) cov n),
+  { ext, simp, split,
+    { rintros ⟨⟨y, hy⟩, h'⟩, exact ⟨y, hy, h'⟩ },
+    { rintros ⟨y, hy, h'⟩, exact ⟨⟨y, hy⟩, h'⟩ } },
+  { refine eq.trans (linear_map.map_span _ _) _,
+    delta subset_submodule bounded_by_submodule spanned_by_sat,
+    rw ← set.image_comp,
+    refine congr_arg _ _,
+    admit }
+end
+
+lemma range_of_bounded_by_subcomplex_inclusion {X : Type*} [topological_space X]
+  (R : Type*) [comm_ring R] (cov : set (set X)) (n : ℕ)
+  : linear_map.range ((@bounded_by_subcomplex_inclusion R _ (Top.of X) cov).f n)
+  = bounded_by_submodule R cov n :=
+begin
+  simp [bounded_by_subcomplex_inclusion, Module.subcomplex_of_compatible_submodules_inclusion],
+  refl
+end
+
+lemma bounded_by_sup {X : Type*} [topological_space X]
+  (R : Type*) [comm_ring R] (cov cov' : set (set X)) (n : ℕ)
+  : @bounded_by_submodule R _ (Top.of X) cov n ⊔ bounded_by_submodule R cov' n
+  = bounded_by_submodule R (cov ∪ cov') n :=
+begin
+  delta bounded_by_submodule spanned_by_sat,
+  rw submodule.sup_spans R,
+  congr,
+  simp,
+  rw ← set.image_union,
+  congr,
+  ext x, split; intro h,
+  { cases h with h,
+    { obtain ⟨s, hs1, hs2⟩ := h, exact ⟨s, or.inl hs1, hs2⟩ },
+    { obtain ⟨s, hs1, hs2⟩ := h, exact ⟨s, or.inr hs1, hs2⟩ } },
+  { obtain ⟨s, h', h''⟩ := h, cases h' with h',
+    { left, exact ⟨s, h', h''⟩ },
+    { right, exact ⟨s, h', h''⟩ } }
+end
+
+lemma zero_ring_all_iso (R : Type*) [comm_ring R] (h : (1 : R) = 0) {M N : Module R}
+  (f : M ⟶ N) : category_theory.is_iso f :=
+  ⟨⟨0, by { simp, ext, change 0 = x, transitivity (1 : R) • x, rw h, simp, simp },
+      by { simp, ext, change 0 = x, transitivity (1 : R) • x, rw h, simp, simp }⟩⟩.
+
+theorem excision {X : Type*} [topological_space X] (R : Type*) [comm_ring R]
+  (A B : set X) (hA : is_open A) (hB : is_open B) (hCov : A ∪ B = ⊤)
+  : quasi_iso ((singular_chain_complex_of_pair R).map (excision_map A B)) :=
+begin
+  by_cases htrivial : (1 : R) = (0 : R),
+  { constructor, intro, apply zero_ring_all_iso, exact htrivial },
+  have hnontriv : nontrivial R := ⟨⟨1, 0, htrivial⟩⟩,
+
+  letI := singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair_quasi_iso
+            R (excision_outer_map A B) _ { A, B } _ _,
+  { have hA : category_theory.is_iso (@bounded_by_subcomplex_inclusion R _ (Top.of A) {set.univ}),
+    { apply bounded_by_subcomplex_inclusion_iso_of_contains_univ, apply set.mem_singleton },
+    have hInter : category_theory.is_iso (@bounded_by_subcomplex_inclusion R _ (Top.of (A ∩ B : set X))
+                                            (pullback_family_of_sets {set.univ} (excision_inner_map A B))),
+    { apply bounded_by_subcomplex_inclusion_iso_of_contains_univ, existsi set.univ, simp },
+    let f1 := singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair R 
+               (category_theory.arrow.mk (excision_inner_map A B)) {set.univ},
+    have h1 : category_theory.is_iso f1,
+    { apply_with category_theory.functor.map_is_iso {instances := ff}, 
+      apply_with category_theory.arrow.is_iso_of_iso_left_of_is_iso_right {instances := ff},
+      exact hInter, exact hA },
+    letI := h1,
+    have H : ∀ s, s ∈ {set.univ} → (∃ t, t ∈ {A, B} ∧ excision_include A '' s ⊆ t),
+    { intros s hs, existsi A, split, { apply set.mem_insert }, { simp [excision_include] } },
+    let f2 := singular_chain_complex_of_pair_under_cover_map R (excision_map A B) {set.univ} {A, B} H,
+    let f3 := (singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair R (excision_outer_map A B) {A, B}),
+    suffices : category_theory.is_iso f2
+             ∧ category_theory.inv f1 ≫ f2 ≫ f3
+             = (singular_chain_complex_of_pair R).map (excision_map A B),
+    { rw ← this.right, letI := this.left, apply_instance, },
+    split,    
+    { let i : Π n, (bounded_by_subcomplex R (pullback_family_of_sets {set.univ} (excision_inner_map A B))).X n
+                 ⟶ ((singular_chain_complex R).obj (Top.of X)).X n
+            := λ n, linear_map.dom_restrict (((singular_chain_complex R).map (⟨subtype.val, continuous_subtype_val⟩ : Top.of (A ∩ B : set X) ⟶ Top.of X)).f n) _,
+      let j : Π n, (bounded_by_subcomplex R {set.univ}).X n
+                 ⟶ ((singular_chain_complex R).obj (Top.of X)).X n
+            := λ n, linear_map.dom_restrict (((singular_chain_complex R).map (⟨subtype.val, continuous_subtype_val⟩ : Top.of A ⟶ Top.of X)).f n) _,
+      let k : Π n, (bounded_by_subcomplex R (pullback_family_of_sets {A, B} (excision_outer_map A B))).X n
+                 ⟶ ((singular_chain_complex R).obj (Top.of X)).X n
+            := λ n, linear_map.dom_restrict (((singular_chain_complex R).map (⟨subtype.val, continuous_subtype_val⟩ : Top.of B ⟶ Top.of X)).f n) _,
+      let ℓ : Π n, (bounded_by_subcomplex R {A, B}).X n
+                 ⟶ ((singular_chain_complex R).obj (Top.of X)).X n
+            := λ n, (bounded_by_subcomplex_inclusion R {A, B}).f n,
+      have hi : ∀ n, function.injective (i n),
+      { rintros n ⟨x, hx⟩ ⟨y, hy⟩ hxy, apply subtype.eq,
+        exact singular_chain_complex_map_inj R (⟨subtype.val, continuous_subtype_val⟩ : Top.of (A ∩ B : set X) ⟶ Top.of X) subtype.val_injective n hxy },
+      have hj : ∀ n, function.injective (j n),
+      { rintros n ⟨x, hx⟩ ⟨y, hy⟩ hxy, apply subtype.eq,
+        exact singular_chain_complex_map_inj R (⟨subtype.val, continuous_subtype_val⟩ : Top.of A ⟶ Top.of X) subtype.val_injective n hxy,
+        exact A, apply_instance },
+      have hk : ∀ n, function.injective (k n),
+      { rintros n ⟨x, hx⟩ ⟨y, hy⟩ hxy, apply subtype.eq,
+        exact singular_chain_complex_map_inj R (⟨subtype.val, continuous_subtype_val⟩ : Top.of B ⟶ Top.of X) subtype.val_injective n hxy },
+      have hℓ : ∀ n, function.injective (ℓ n),
+      { rintros n ⟨x, hx⟩ ⟨y, hy⟩ hxy, apply subtype.eq, exact hxy },
+      have H : ∀ n, linear_map.range (i n) = linear_map.range (j n) ⊓ linear_map.range (k n),
+      { intro n,
+        dsimp [i, j, k],
+        refine eq.trans (range_of_singular_chain_complex_include_subspace R _ _ n) _,
+        refine eq.trans _ (congr_arg2 _ (range_of_singular_chain_complex_include_subspace R _ _ n).symm
+                                        (range_of_singular_chain_complex_include_subspace R _ _ n).symm),
+        delta subset_submodule bounded_by_submodule spanned_by_sat,
+        rw submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of X))
+                                      _ _ (set.image_subset_range _ _) (set.image_subset_range _ _),
+        rw [set.image_inter (@basis.injective _ R _ _ _ _
+                                        ((singular_chain_complex_basis R n).get_basis (Top.of X))
+                                        hnontriv)],
+        congr,
+        simp, ext x, split; intro h,
+        { exact ⟨subset_trans h (set.inter_subset_left A B),
+                 subset_trans h (set.inter_subset_right A B)⟩ },
+        { exact set.subset_inter h.left h.right } },
+      have H' : ∀ n, linear_map.range (ℓ n) = linear_map.range (j n) ⊔ linear_map.range (k n),
+      { intro n,
+        dsimp [ℓ, j, k],
+        refine eq.trans (range_of_bounded_by_subcomplex_inclusion R _ n) _,
+        refine eq.trans _ (congr_arg2 _ (range_of_singular_chain_complex_include_subspace R _ _ n).symm
+                                        (range_of_singular_chain_complex_include_subspace R _ _ n).symm),
+        delta subset_submodule,
+        rw bounded_by_sup,
+        congr, },
+      dsimp [f2, singular_chain_complex_of_pair_under_cover_map],
+      apply coker_of_mono_bicartesian_square_is_iso;
+      try { delta bounded_by_pullback_chain_inclusion };
+      try { apply bounded_by_subcomplex_map_mono, dsimp [excision_map] };
+      try { rintros ⟨x, hx⟩ ⟨y, hy⟩ hxy, apply subtype.eq };
+      try { exact hxy }; try { have := congr_arg subtype.val hxy, exact this },
+      { apply is_pullback_of_is_is_pullback_eval, intro n,
+        refine Module.inter_is_pullback R (((singular_chain_complex R).obj (Top.of X)).X n)
+                                        (i n)  (j n)  (k n)  (ℓ n)
+                                        (hi n) (hj n) (hk n) (hℓ n) 
+                                        _ _ _ _ 
+                                        (H n),
+        { apply linear_map.ext, rintro ⟨x, hx⟩,
+          rw category_theory.comp_apply,
+          dsimp [i, j],
+          dsimp [bounded_by_subcomplex_map, subcomplex_spanned_by_map],
+          rw [← category_theory.comp_apply, ← homological_complex.comp_f,
+              ← (singular_chain_complex R).map_comp],
+          congr, },
+        { apply linear_map.ext, rintro ⟨x, hx⟩,
+          rw category_theory.comp_apply,
+          dsimp [i, k],
+          delta bounded_by_subcomplex_map subcomplex_spanned_by_map,
+          rw [linear_map.cod_restrict_apply, linear_map.dom_restrict_apply,
+              ← category_theory.comp_apply, ← homological_complex.comp_f,
+              ← (singular_chain_complex R).map_comp],
+          congr },
+        { apply linear_map.ext, rintro ⟨x, hx⟩,
+          rw category_theory.comp_apply,
+          dsimp [ℓ, j],
+          rw [← category_theory.comp_apply, ← homological_complex.comp_f],
+          rw ← cover_inclusion_natural,
+          rw [homological_complex.comp_f, category_theory.comp_apply],
+          congr, },
+        { apply linear_map.ext, rintro ⟨x, hx⟩,
+          rw category_theory.comp_apply,
+          dsimp [ℓ, k],
+          rw [← category_theory.comp_apply, ← homological_complex.comp_f],
+          rw ← cover_inclusion_natural,
+          rw [homological_complex.comp_f, category_theory.comp_apply],
+          congr, } },
+      { apply is_pushout_of_is_is_pushout_eval, intro n,
+        refine Module.sum_is_pushout R (((singular_chain_complex R).obj (Top.of X)).X n)
+                                     (i n)  (j n)  (k n)  (ℓ n)
+                                     (hi n) (hj n) (hk n) (hℓ n) 
+                                     _ _ _ _ 
+                                     (H n) (H' n),
+        { apply linear_map.ext, rintro ⟨x, hx⟩,
+          rw category_theory.comp_apply,
+          dsimp [i, j],
+          dsimp [bounded_by_subcomplex_map, subcomplex_spanned_by_map],
+          rw [← category_theory.comp_apply, ← homological_complex.comp_f,
+              ← (singular_chain_complex R).map_comp],
+          congr, },
+        { apply linear_map.ext, rintro ⟨x, hx⟩,
+          rw category_theory.comp_apply,
+          dsimp [i, k],
+          delta bounded_by_subcomplex_map subcomplex_spanned_by_map,
+          rw [linear_map.cod_restrict_apply, linear_map.dom_restrict_apply,
+              ← category_theory.comp_apply, ← homological_complex.comp_f,
+              ← (singular_chain_complex R).map_comp],
+          congr },
+        { apply linear_map.ext, rintro ⟨x, hx⟩,
+          rw category_theory.comp_apply,
+          dsimp [ℓ, j],
+          rw [← category_theory.comp_apply, ← homological_complex.comp_f],
+          rw ← cover_inclusion_natural,
+          rw [homological_complex.comp_f, category_theory.comp_apply],
+          congr, },
+        { apply linear_map.ext, rintro ⟨x, hx⟩,
+          rw category_theory.comp_apply,
+          dsimp [ℓ, k],
+          rw [← category_theory.comp_apply, ← homological_complex.comp_f],
+          rw ← cover_inclusion_natural,
+          rw [homological_complex.comp_f, category_theory.comp_apply],
+          congr, } } },
+    { rw category_theory.is_iso.inv_comp_eq,
+      dsimp [f2, f3, f1],
+      apply singular_chain_complex_of_pair_under_cover_to_singular_chain_complex_of_pair_naturality } },
+  { rintros ⟨x, hx⟩ ⟨y, hy⟩ hxy, ext, exact hxy },
+  { simp, exact ⟨hA, hB⟩ },
+  { simp, exact hCov }
+end.
+

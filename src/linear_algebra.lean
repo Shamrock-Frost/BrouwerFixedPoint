@@ -66,9 +66,11 @@ begin
   existsi x, refl
 end
 
-local attribute [instance] classical.prop_decidable 
-lemma basis.mem_span_iff (R : Type) [comm_ring R] {M : Type*}
-  [add_comm_monoid M] [module R M] {ι : Type*}
+local attribute [instance] classical.prop_decidable
+universes u v w
+
+lemma basis.mem_span_iff (R : Type u) [comm_ring R] {M : Type v}
+  [add_comm_monoid M] [module R M] {ι : Type w}
   (b : basis ι R M) (S : set M) (hS : S ⊆ set.range b) (x : M)
   : x ∈ submodule.span R S ↔ (∀ i, b.repr x i ≠ 0 → b i ∈ S) :=
 begin
@@ -151,4 +153,27 @@ begin
   { rw basis.mem_span_iff R b (S ∩ T) (subset_trans (set.inter_subset_left S T) hS) at h,
     simp, rw [basis.mem_span_iff R b S hS, basis.mem_span_iff R b T hT],
     split; intros i hi, { exact (h i hi).left }, { exact (h i hi).right } }
+end
+
+lemma submodule.sup_spans (R : Type) [comm_ring R] {M : Type*}
+  [add_comm_monoid M] [module R M] (S T : set M)
+  : submodule.span R S ⊔ submodule.span R T = submodule.span R (S ∪ T) :=
+begin
+  apply eq_of_forall_ge_iff, intro N,
+  rw sup_le_iff,
+  split; intro h,
+  { rw submodule.span_le,
+    intros x hx, cases hx,
+    { exact h.left (submodule.subset_span hx) },
+    { exact h.right (submodule.subset_span hx) } },
+  { split; refine le_trans _ h; apply submodule.span_mono; simp }
+end
+
+lemma map_domain_inj_of_inj {α β : Type*} {M : Type*} [add_comm_monoid M]
+  (f : α → β) (hf : function.injective f)
+  : function.injective (@finsupp.map_domain α β M _ f) :=
+begin
+  intros p q h, ext a,
+  convert congr_arg (λ g : β →₀ M, g (f a)) h;
+  rw finsupp.map_domain_apply hf, 
 end

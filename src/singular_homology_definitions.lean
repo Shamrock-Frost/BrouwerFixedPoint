@@ -98,3 +98,14 @@ begin
     exact not_lt_zero' hc }
 end
 
+lemma singular_chain_complex_map_inj (R : Type*) [comm_ring R] {X Y : Top} 
+  (f : X ⟶ Y) (hf : function.injective f) (n : ℕ) 
+  : function.injective (((singular_chain_complex R).map f).f n) :=
+begin
+  refine map_domain_inj_of_inj _ _, 
+  intros σ τ hστ, dsimp at hστ, 
+  ext p,
+  have := congr_arg (λ g : topological_simplex n → Y, g p)
+                    (congr_arg continuous_map.to_fun hστ),
+  exact hf this
+end

@@ -6,6 +6,7 @@ import algebra.homology.homotopy
 import algebra.homology.quasi_iso
 import category_theory.preadditive.left_exact
 import category_theory.abelian.functor_category
+import category_theory.limits.shapes.comm_sq
 import data.list.tfae
 
 import for_mathlib.homological_complex_abelian
@@ -159,6 +160,16 @@ begin
   { exact (exact_iff_exact_seq _ _).mpr (h2.extract 0 2) },
   { exact (exact_iff_exact_seq _ _).mpr (h2.extract 1 3) },
   { apply to_zero_exact_of_epi, apply_instance }
+end
+
+lemma coker_of_mono_bicartesian_square_is_iso {V : Type*} [category V] [abelian V] {X A B Y  : V}
+  (i : X ⟶ A)  (j : X ⟶ B)  (k : A ⟶ Y)  (ℓ : B ⟶ Y)
+  (hi : mono i) (hj : mono j) (hk : mono k) (hℓ : mono ℓ)
+  (h1 : is_pullback i j k ℓ) (h1 : is_pushout i j k ℓ)
+  : is_iso ((coker_functor V).map (arrow.hom_mk h1.to_comm_sq.w.symm
+                                  : arrow.mk i ⟶ arrow.mk ℓ)) :=
+begin
+  admit
 end
 
 section general_abelian_category
@@ -519,6 +530,16 @@ begin
     { exact (exact_iff_exact_seq _ _).mpr (LES2.extract 0 2) },
     { exact (exact_iff_exact_seq _ _).mpr (LES2.extract 1 2) },
     { exact (exact_iff_exact_seq _ _).mpr (LES2.extract 2 2) } }
+end
+
+lemma homological_complex.is_iso_of_degreewise_is_iso [has_zero_morphisms V]
+  {ι : Type*} {c : complex_shape ι} 
+  {C D : homological_complex V c} (f : C ⟶ D) (h : ∀ i, category_theory.is_iso (f.f i))
+  : category_theory.is_iso f :=
+begin
+  convert is_iso.of_iso (hom.iso_of_components (λ i, as_iso (f.f i)) _),
+  swap, { intros, rw [as_iso_hom, as_iso_hom], exact f.comm i j },
+  symmetry, ext : 2, exact hom.iso_of_components_hom_f _ _ _,
 end
 
 end general_abelian_category
