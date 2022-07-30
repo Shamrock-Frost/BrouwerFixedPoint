@@ -162,15 +162,18 @@ begin
   { apply to_zero_exact_of_epi, apply_instance }
 end
 
-lemma coker_of_mono_bicartesian_square_is_iso {V : Type*} [category V] [abelian V] {X A B Y  : V}
-  (i : X ⟶ A)  (j : X ⟶ B)  (k : A ⟶ Y)  (ℓ : B ⟶ Y)
-  (hi : mono i) (hj : mono j) (hk : mono k) (hℓ : mono ℓ)
-  (h1 : is_pullback i j k ℓ) (h1 : is_pushout i j k ℓ)
-  : is_iso ((coker_functor V).map (arrow.hom_mk h1.to_comm_sq.w.symm
+lemma coker_of_cocartesian_square_is_iso {V : Type*} [category V] [abelian V] {X A B Y  : V}
+  (i : X ⟶ A) (j : X ⟶ B) (k : A ⟶ Y) (ℓ : B ⟶ Y) (h : is_pushout i j k ℓ)
+  : is_iso ((coker_functor V).map (arrow.hom_mk h.to_comm_sq.w.symm
                                   : arrow.mk i ⟶ arrow.mk ℓ)) :=
-begin
-  admit
-end
+  let f1 : Y ⟶ cokernel i := h.is_colimit.desc (pushout_cocone.mk (cokernel.π i) 0 (by simp)),
+      f2 := cokernel.desc ℓ f1 (h.is_colimit.fac _ walking_span.right)
+  in ⟨⟨f2, by { ext, dsimp [coker_functor], simp, exact h.is_colimit.fac _ walking_span.left },
+          by { ext, dsimp [coker_functor, f2, f1], simp, 
+               apply h.is_colimit.hom_ext,
+               apply pushout_cocone.coequalizer_ext,
+               { simp, refl },
+               { simp, symmetry, exact cokernel.condition _ } }⟩⟩
 
 section general_abelian_category
 
