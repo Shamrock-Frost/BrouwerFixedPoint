@@ -639,6 +639,37 @@ def singular_chain_complex_basis (R : Type*) [comm_ring R]
                                    congr, ext, refl } },
                                  apply free_module_basis_spanning } }
 
+/-
+Should move this
+-/
+-- noncomputable
+-- def singular_homology0_basis_of_path_component (R : Type*) [comm_ring R] [nontrivial R] (X : Top)
+--   : (zeroth_homotopy X) → (singular_homology R 0).obj X
+--   := @quotient.lift X ((singular_homology R 0).obj X) (path_setoid X)
+--                       (λ x, Module.to_homology ⟨(simplex_to_chain (continuous_map.const (topological_simplex 0) x) R : ((singular_chain_complex R).obj X).X 0),
+--                                                 by { rw homological_complex.d_from_eq_zero,
+--                                                       simp, simp [complex_shape.down] }⟩)
+--                       (by { intros a b h, obtain ⟨p⟩ := h, dsimp, 
+--                             let f : C(topological_simplex 1, X) := ⟨λ x, p ⟨x.val 0, ⟨x.property.left 0, topological_simplex.coord_le_one _ _ x⟩⟩, _⟩,
+--                             { refine Module.to_homology_ext (simplex_to_chain f R) _,
+--                               dsimp [simplex_to_chain],
+--                               rw singular_chain_complex_differential_desc_deg_0,
+--                               rw [add_sub, add_comm, ← add_sub],
+--                               symmetry, convert add_zero _; dsimp [simplex_to_chain];
+--                               try { rw sub_eq_zero, congr };
+--                               ext x;
+--                               have := @unique.eq_default _ topological_simplex.point_unique x;
+--                               subst this;
+--                               dsimp [simplex_category.to_Top', simplex_category.to_Top'_map,
+--                                       simplex_category.δ];
+--                               symmetry,
+--                               { convert p.target, 
+--                                 convert (_ : ({0} : finset (fin 1)).sum topological_simplex.point.val = 1),
+--                                 simp, refl },
+--                               { exact p.source } },
+--                             { dsimp, continuity,
+--                               exact (continuous_apply (0 : fin 2)).comp continuous_subtype_coe } }).
+
 lemma simplex_to_chain_is_basis (R : Type*) [comm_ring R] (n : ℕ) (X : Top)
   (σ : Top.of (topological_simplex n) ⟶ X)
   : @simplex_to_chain n (Top.to_sSet'.obj X) σ R _
@@ -647,6 +678,224 @@ begin
   intros, dsimp [functor_basis.get_basis, simplex_to_chain], rw basis.mk_apply,
   symmetry, refine eq.trans finsupp.map_domain_single _,
   congr, apply category.id_comp
+end
+
+noncomputable
+def singular_homology0_basis (R : Type*) [comm_ring R] [nontrivial R] (X : Top)
+  : basis (zeroth_homotopy X) R ((singular_homology R 0).obj X) :=
+  have hrel : (complex_shape.down ℕ).rel 1 0, by { rw complex_shape.down_rel },
+  have hnone : (complex_shape.down ℕ).next 0 = none,
+  by { dsimp [complex_shape.next], 
+       apply_with option.choice_eq_none {instances:=ff},
+       constructor, rintro ⟨i, hi⟩,
+       simp [complex_shape.down] at hi,
+       exact hi },
+  have hnat : homological_complex.d_to ((singular_chain_complex R).obj X) 0
+            ≫ (iso.refl (((singular_chain_complex R).obj X).X 0)).hom
+            = (homological_complex.X_prev_iso ((singular_chain_complex R).obj X) hrel).hom
+            ≫ ((singular_chain_complex R).obj X).d 1 0,
+  by { simp [iso.refl], exact homological_complex.d_to_eq _ hrel },
+  have hs : set.range (quot.mk (path_setoid X).r ∘ λ (x : Σ (i : unit), C(↥(topological_simplex 0), X)), x.snd topological_simplex.point)
+          = set.univ,
+  by { rw set.eq_univ_iff_forall, intro x, induction x,
+       { rw set.range_comp,
+         refine set.mem_image_of_mem _ _,
+         exact ⟨⟨(), continuous_map.const _ x⟩, rfl⟩ },
+       { refl } },
+  let f1 := homology_iso_cokernel 0 hnone ((singular_chain_complex R).obj X),
+      f2 := cokernel.map_iso (((singular_chain_complex R).obj X).d_to 0)
+                            (((singular_chain_complex R).obj X).d 1 0)
+                            (((singular_chain_complex R).obj X).X_prev_iso hrel)
+                            (iso.refl _) hnat,
+      f3 := Module.cokernel_iso_range_quotient (((singular_chain_complex R).obj X).d 1 0),
+      L := (f1 ≪≫ f2 ≪≫ f3).to_linear_equiv,
+      s : setoid (Σ (i : unit), C(topological_simplex 0, X)) :=
+        (path_setoid X).comap (λ x, x.snd topological_simplex.point),
+      e : quotient s ≃ zeroth_homotopy X :=
+        (setoid.comap_quotient_equiv _ _).trans ((equiv.set_congr hs).trans (equiv.set.univ _))
+  in by { refine basis.reindex ⟨L.trans (((singular_chain_complex_basis R 0).get_basis X).quotient_basis _ _ _ _ s _).repr⟩ e,
+          rw linear_map.range_eq_map,
+          rw ← (singular_chain_complex_basis R 1).spanning,
+          rw linear_map.map_span,
+          congr' 1,
+          ext, split; rintro ⟨i, hi, Hi⟩; subst Hi,
+          { obtain ⟨j, σ, Hi⟩ := hi, cases j, subst Hi,
+            dsimp [singular_chain_complex R, homological_complex.eval],
+            refine ⟨(⟨(), simplex_category.to_Top'.map (@simplex_category.δ 0 0) ≫ σ⟩, 
+                     ⟨(), simplex_category.to_Top'.map (@simplex_category.δ 0 1) ≫ σ⟩), _⟩,
+            rw [← simplex_to_chain_is_basis, ← simplex_to_chain_is_basis],
+            dsimp [singular_chain_complex_basis, simplex_to_chain],
+            rw singular_chain_complex_map,
+            rw (_ : 𝟙 (Top.of (topological_simplex 1)) ≫ σ = σ), swap, exact category.id_comp σ,
+            refine ⟨⟨_⟩, (singular_chain_complex_differential_desc_deg_0 R σ).symm⟩,
+            dsimp,
+            rw [deg_zero_oneth_coface_map_is_vertex_zero, deg_zero_zeroth_coface_map_is_vertex_one],
+            refine ⟨(@Top.iso_of_homeo (Top.of (topological_simplex 1)) (Top.of unit_interval)
+                                       one_simplex_homeo_interval).inv ≫ σ, _, _⟩,
+            { simp [Top.iso_of_homeo, one_simplex_homeo_interval],
+              congr,
+              ext i, fin_cases i; simp [vertex],
+              { symmetry, 
+                apply finset.sum_eq_zero,
+                intro x, fin_cases x,
+                simp [simplex_category.mk, simplex_category.const, simplex_category.hom.mk],
+                exact ne.symm fin.zero_ne_one },
+              { split_ifs, cases h,
+                rw finset.filter_true_of_mem,
+                { rw fin.univ_def,
+                  delta simplex_category.mk simplex_category.len,
+                  simp [finset.fin_range, list.fin_range, list.range, list.range_core, list.pmap],
+                  refl },
+                { intros x hx, fin_cases x, ext, refl } } },
+            { simp [Top.iso_of_homeo, one_simplex_homeo_interval],
+              congr,
+              ext i, fin_cases i; simp [vertex],
+              { symmetry, 
+                rw fin.univ_def,
+                delta simplex_category.mk simplex_category.len,
+                simp [finset.fin_range, list.fin_range, list.range, list.range_core, list.pmap],
+                transitivity finset.sum {(0 : fin 1)} topological_simplex.point.val,
+                { congr }, { simp [topological_simplex.point] } },
+              { split_ifs, cases h,
+                transitivity finset.sum ∅ topological_simplex.point.val,
+                { simp },
+                { congr } } } },
+          { rcases i with ⟨⟨i1, σ⟩, ⟨i2, τ⟩⟩, cases i1, cases i2,
+            obtain ⟨⟨f, hf1, hf2⟩⟩ := hi,
+            refine ⟨simplex_to_chain ((@Top.iso_of_homeo (Top.of (topological_simplex 1))
+                                                         (Top.of unit_interval)
+                                                         one_simplex_homeo_interval).hom ≫ f) R, _⟩,
+            refine ⟨⟨(), (@Top.iso_of_homeo (Top.of (topological_simplex 1)) (Top.of unit_interval)
+                                            one_simplex_homeo_interval).hom ≫ f, _⟩, _⟩,
+
+            { dsimp [singular_chain_complex_basis, simplex_to_chain],
+              convert singular_chain_complex_map R 1 _ _ },
+            { dsimp [simplex_to_chain],
+              rw singular_chain_complex_differential_desc_deg_0,
+              rw [← simplex_to_chain_is_basis, ← simplex_to_chain_is_basis],
+              congr; ext p;
+              have : p = topological_simplex.point
+                   := @unique.eq_default _ topological_simplex.point_unique p; subst this,
+              { exact hf1 },
+              { refine eq.trans _ hf2,
+                simp [simplex_category.to_Top', simplex_category.to_Top'_map,
+                      Top.iso_of_homeo, one_simplex_homeo_interval,
+                      topological_simplex.point],
+                refine congr_arg _ _,
+                ext, dsimp,
+                transitivity finset.sum {(0 : fin 1)} topological_simplex.point.val,
+                { congr },
+                { simp, refl } } } } }.
+
+/-
+Move this
+-/
+lemma setoid.quotient_ker_equiv_range_symm_apply {α : Type*} {β : Type*} (f : α → β)
+  (x : α) (y : set.range f) (h : f x = y.val)
+  : (setoid.quotient_ker_equiv_range f).symm y = quot.mk (setoid.ker f).r x :=
+begin
+  dsimp [setoid.quotient_ker_equiv_range, equiv.of_bijective],
+  have := setoid.quotient_ker_equiv_range._proof_2 f,
+  refine this.left _,
+  refine eq.trans (function.surj_inv_eq this.right y) _,
+  ext, symmetry, exact h
+end.
+
+lemma singular_homology0_basis_apply (R : Type*) [comm_ring R] [nontrivial R] (X : Top) (x : X)
+  : singular_homology0_basis R X (quot.mk (path_setoid X).r x) 
+  = Module.to_homology ⟨simplex_to_chain (continuous_map.const _ x) R, by simp⟩ :=
+begin
+  simp only [singular_homology0_basis, basis.reindex, basis.coe_of_repr, linear_equiv.trans_symm,
+             category_theory.iso.to_linear_equiv_symm_apply,
+             linear_equiv.trans_apply,
+             finsupp.dom_lcongr_symm,
+             equiv.symm_trans_apply,
+             category_theory.iso.trans_inv,
+             category_theory.iso.refl_inv,
+             basis.repr_symm_apply,
+             function.comp_app,
+             one_smul,
+             finsupp.total_single,
+             category_theory.category.assoc,
+             finsupp.dom_lcongr_single,
+             Module.coe_comp, homology_iso_cokernel,
+             Module.cokernel_iso_range_quotient],
+  rw [← category_theory.comp_apply (iso.inv _) (iso.inv _), ← category_theory.iso.trans_inv],
+  rw cokernel_map_iso_trans_iso_colimit_cocone,
+  simp only [],
+  delta cokernel.desc,
+  rw ← category_theory.comp_apply,
+  rw colimit_iso_colimit_cocone_desc,
+  simp [is_colimit.precompose_hom_equiv],
+  delta cokernel_cofork.of_π,
+  dsimp [cofork.of_π],
+  dsimp [cocones.precompose_equivalence, cocones.precompose],
+  simp [Module.cokernel_is_colimit, cofork.is_colimit.mk, Module.cokernel_cocone],
+  -- dsimp [cofork.π],
+  delta cofork.π,
+  simp only [nat_trans.comp_app, parallel_pair.ext, nat_iso.of_components],
+  simp only [quot.congr.equations._eqn_1,
+             equiv.subtype_equiv_symm,
+             equiv.symm_trans_apply,
+             quotient.congr_right.equations._eqn_1,
+             equiv.coe_fn_symm_mk,
+             setoid.comap_quotient_equiv.equations._eqn_1,
+             id.def,
+             equiv.set.univ.equations._eqn_1,
+             equiv.set_congr.equations._eqn_1,
+             equiv.refl_symm,
+             equiv.subtype_equiv_prop.equations._eqn_1,
+             subtype.coe_mk,
+             equiv.subtype_equiv_apply,
+             quot.congr_right.equations._eqn_1,
+             equiv.coe_refl,
+             quot.map],
+  rw @setoid.quotient_ker_equiv_range_symm_apply (Σ (i : unit), C(topological_simplex 0, X)) _ _
+                                                 ⟨(), continuous_map.const _ x⟩,
+  swap, { refl },
+  simp only [basis.mk_apply, basis.quotient_basis.equations._eqn_1, submodule.liftq_apply,
+             function.comp_app, Module.coe_comp],
+  rw ← simplex_to_chain_is_basis,
+  dsimp [iso.refl],
+
+  have hnone : (complex_shape.down ℕ).next 0 = none,
+  { simp },
+
+  transitivity Module.as_hom_right (@is_linear_map.mk' R (linear_map.ker (((singular_chain_complex R).obj X).d_from 0))
+                                            (((singular_chain_complex R).obj X).homology 0)
+                                            _ _ _ _ _ 
+                                            Module.to_homology
+                                            (Module.to_homology.homomorphism _ 0))
+                                   (Module.to_cycles_terminal_hom hnone 
+                                     (simplex_to_chain (continuous_map.const (topological_simplex 0) x) R
+                                     : ((singular_chain_complex R).obj X).X 0)),
+  swap, { refl },
+  rw [← category_theory.comp_apply],
+  refine congr_fun _ _,
+  refine congr_arg _ _,
+  
+  transitivity cokernel.π (((singular_chain_complex R).obj X).d_to 0) ≫
+               (homology_iso_cokernel 0 hnone ((singular_chain_complex R).obj X)).inv,
+  { simp [homology_iso_cokernel] },
+  exact Module.homology_iso_cokernel_spec hnone,
+end.
+
+lemma singular_homology0_map_matrix (R : Type*) [comm_ring R] [nontrivial R]
+  {X Y : Top} (f : X ⟶ Y) (x : X)
+  : (singular_homology R 0).map f (singular_homology0_basis R X (quot.mk (path_setoid X).r x))
+  = singular_homology0_basis R Y (quot.mk (path_setoid Y).r (f x)) :=
+begin
+  rw [singular_homology0_basis_apply, singular_homology0_basis_apply],
+  dsimp [singular_homology],
+  delta Module.to_homology, 
+  rw ← category_theory.comp_apply,
+  simp,
+  refine congr_arg _ _,
+  refine eq.trans (Module.cycles_map_to_cycles _ _) _,
+  congr,
+  refine eq.trans (singular_chain_complex_map _ _ _ _) _,
+  delta simplex_to_chain,
+  congr
 end
 
 lemma prod_of_contractible_contractible (X Y : Type*) [topological_space X] [topological_space Y]
@@ -712,13 +961,10 @@ def singular_homology.chain_homotopy_of_homotopy (R : Type*) [comm_ring R]
   by { apply functor_basis.homology_ext (singular_chain_complex_basis R 0),
        intro i, cases i,
        refine exists.intro (simplex_to_chain _ R) _,
-       { refine ⟨(λ p, (⟨p.val 0, p.property.left 0, topological_simplex.coord_le_one 1 0 p⟩,
-                         topological_simplex.point)), _⟩,
+       { refine ⟨(λ p, (one_simplex_homeo_interval.to_fun p, topological_simplex.point)), _⟩,
          continuity,
-         apply continuous.congr
-                 (continuous.comp (continuous_apply 0 : continuous (λ x : fin 2 → ℝ, x 0))
-                                 continuous_subtype_val),
-         intro x, cases x, simp },
+         change continuous one_simplex_homeo_interval.to_fun,
+         exact one_simplex_homeo_interval.continuous_to_fun },
        dsimp [simplex_to_chain],
        rw singular_chain_complex_differential_desc_deg_0,
        rw [inclusion_at_t_nat_trans_on_chain, inclusion_at_t_nat_trans_on_chain],
@@ -733,11 +979,12 @@ def singular_homology.chain_homotopy_of_homotopy (R : Type*) [comm_ring R]
          simp, congr,
          apply @unique.eq_default _ topological_simplex.point_unique },
        { symmetry, rw sub_eq_zero, congr,
-         ext : 3, simp [simplex_category.to_Top'_map],
-         refine eq.trans x.property.right.symm _,
-         congr,
-         simp, 
-         apply @unique.eq_default _ topological_simplex.point_unique } },
+         ext : 3, 
+         { simp [simplex_category.to_Top'_map],
+           refine eq.trans x.property.right.symm _, 
+           dsimp [one_simplex_homeo_interval],
+           congr }, 
+         { simp, apply @unique.eq_default _ topological_simplex.point_unique } } },
   let s := (lift_nat_trans_unique
              (singular_chain_complex_basis R)
              (cylinder ⋙ singular_chain_complex R)

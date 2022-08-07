@@ -8,8 +8,13 @@ import algebra.homology.Module
 import algebra.homology.homotopy
 import algebraic_topology.simplex_category
 import algebraic_topology.topological_simplex
+import category_theory.adjunction.limits
+import algebra.category.Module.colimits
+
+import for_mathlib.ab4
 
 import .homological_algebra
+import .preserves_colimits_functor_category .alternating_face_map_complex .Module_AB4
 
 open category_theory algebraic_topology
 open_locale big_operators
@@ -109,3 +114,31 @@ begin
                     (congr_arg continuous_map.to_fun hστ),
   exact hf this
 end
+
+noncomputable
+instance singular_chain_complex_preserves_coprod (R : Type*) [comm_ring R] {J : Type} (f : J → Top)
+  : limits.preserves_colimit (discrete.functor f) (singular_chain_complex R) :=
+begin
+  apply_with limits.comp_preserves_colimit {instances:=ff},
+  { apply Top.to_sSet'_preserves_coprod },
+  { apply_with limits.comp_preserves_colimit {instances:=ff},
+    { apply_with limits.preserves_colimits_of_shape.preserves_colimit {instances:=ff},
+      apply_with category_theory.whiskering_right_preserves_colimits_of_shape {instances:=ff},
+      apply_instance,
+      apply (Module.adj R).left_adjoint_preserves_colimits.preserves_colimits_of_shape },
+    { apply category_theory.limits.preserves_colimits_of_size.preserves_colimits_of_shape.preserves_colimit,
+      apply alternating_face_map_complex.preserves_colimits } }
+end
+
+noncomputable
+instance singular_homology_preserves_coprod (R : Type*) [comm_ring R] (n : ℕ) {J : Type} (f : J → Top)
+  : limits.preserves_colimit (discrete.functor f) (singular_homology R n) :=
+begin
+  apply_with limits.comp_preserves_colimit {instances:=ff},
+  { apply_instance },
+  { let := @category_theory.homology_functor_preserves_coproducts (Module R) (Module.Module_category R) ℕ
+             (complex_shape.down ℕ) J _,
+    letI := (λ (J : Type), limits.has_colimits_of_shape_of_has_colimits_of_size : limits.has_coproducts (Module R)),
+    apply_instance}
+end
+

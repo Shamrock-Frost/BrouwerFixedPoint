@@ -23,6 +23,16 @@ local attribute [instance]
   category_theory.concrete_category.has_coe_to_sort
   category_theory.concrete_category.has_coe_to_fun
 
+lemma cokernel_map_iso_trans_iso_colimit_cocone (V : Type*) [category V] [has_zero_morphisms V]
+  [has_cokernels V]
+  {A B A' B' : V} (f : A ⟶ B) (f' : A' ⟶ B')
+  (p : A ≅ A') (q : B ≅ B') (w : f ≫ q.hom = p.hom ≫ f')
+  (c : cokernel_cofork f') (hc : is_colimit c)
+  : cokernel.map_iso f f' p q w ≪≫ colimit.iso_colimit_cocone ⟨c, hc⟩
+  = let α := @parallel_pair.ext V _ (parallel_pair f 0) (parallel_pair f' 0) p q w (by simp) in
+    colimit.iso_colimit_cocone ⟨(category_theory.limits.cocones.precompose α.hom).obj c,
+                                (is_colimit.precompose_hom_equiv α c).symm hc⟩ := by { ext, simp }
+
 noncomputable
 def coker_functor (V : Type*) [category V] [has_zero_morphisms V] [has_cokernels V]
   : arrow V ⥤ V := {
@@ -44,10 +54,7 @@ noncomputable
 def coker_functor_proj (V : Type*) [category V] [has_zero_morphisms V] [has_cokernels V]
   : arrow.right_func ⟶ coker_functor V := {
     app := λ f, cokernel.π f.hom,
-    naturality' := λ f g ϕ, by { change ϕ.right ≫ cokernel.π g.hom
-                                      = cokernel.π f.hom ≫ cokernel.map _ _ _ _ ϕ.w.symm,
-                                 rw coker_map_spec,
-                                 refl }
+    naturality' := λ f g ϕ, by { dsimp [coker_functor], simp }
   }
 
 -- Why can't lean synthesize the arrow_preadditive instance?
@@ -55,17 +62,305 @@ instance coker_additive {V : Type*} [category V] [preadditive V] [has_cokernels 
   : @functor.additive _ _ _ _ arrow_preadditive _ (coker_functor V) :=
   ⟨by { rintros ⟨f⟩ ⟨g⟩ ⟨αl, αr⟩ ⟨βl, βr⟩, dsimp [coker_functor], ext, simp }⟩.
 
--- lemma coker_right_exact {V : Type*} [category V] [abelian V]
---   {f g h : arrow V} (α : f ⟶ g) (β : g ⟶ h)
---   (h : @short_exact _ _ _ _ _ α β
---                     (@preadditive.preadditive_has_zero_morphisms _ _ arr_ab.to_preadditive)
---                     arr_ab.has_kernels
---                     (@abelian.of_coimage_image_comparison_is_iso.has_images _ _
---                                                                             arr_ab.to_preadditive
---                                                                             arr_ab.has_kernels
---                                                                             arr_ab.has_cokernels
---                                                                             (@abelian.coimage_image_comparison.category_theory.is_iso _ _ arr_ab)))
---   : exact ((coker_functor V).map f) (F.map g) ∧ epi (F.map g)
+universes u'' v' u' v u
+
+-- noncomputable
+-- instance coker_preserves_coprod {V : Type u} [category.{(max u'' v)} V] [has_zero_morphisms V]
+--   [has_colimits V] {J : Type u''} (f : J → arrow V)
+--   : limits.preserves_colimit (discrete.functor f) (coker_functor V) :=
+-- begin
+--   apply preserves_colim_into_arrow_category, intros,
+--   refine ⟨_, _, _⟩,
+--   { intro s, 
+--      -- we're pulling back by the natural transformation cod -> coker_functor.proj, I think?
+--     let s' := (cocones.precompose (whisker_left (discrete.functor f) (coker_functor_proj V))).obj s,
+--     refine cokernel.desc _ (hc2.desc s') _, 
+--     dsimp [category_theory.iso_to_equiv, arrow_category_iso_functor_category],
+--     let s'' : cocone (discrete.functor f ⋙ arrow.left_func) 
+--             := { X := s.X, ι := { app := λ j, 0, naturality' := by { intros, simp, } } },
+--     transitivity hc1.desc s'',
+--     { refine hc1.uniq s'' _ _,
+--       rintro ⟨j⟩, dsimp,
+--       rw [← category.assoc],
+--       change (c1.ι.app ⟨j⟩ ≫ hc1.desc ((cocones.precompose (whisker_left (discrete.functor f) arrow.left_to_right)).obj c2)) ≫ hc2.desc s' = 0,
+--       rw hc1.fac,
+--       dsimp, rw category.assoc,
+--       rw hc2.fac,
+--       dsimp [s', coker_functor_proj],
+--       rw ← category.assoc, simp },
+--     { refine eq.symm (hc1.uniq s'' _ _),
+--       intro, exact comp_zero } },
+--   { intros s j,
+--     dsimp [coker_functor, category_theory.iso_to_equiv, arrow_category_iso_functor_category],
+--     ext, simp, 
+--     exact hc2.fac _ _ },
+--   { intros s m h,
+--     dsimp [coker_functor, category_theory.iso_to_equiv, arrow_category_iso_functor_category],
+--     ext,
+--     refine eq.trans _ (eq.symm (category_theory.limits.cokernel.π_desc _ _ _)),
+--     let s' := (cocones.precompose (whisker_left (discrete.functor f) (coker_functor_proj V))).obj s,
+--     refine hc2.uniq s' _ _,
+--     intro j, specialize h j,
+--     simp at ⊢ h,
+--     dsimp [coker_functor,
+--            category_theory.iso_to_equiv, arrow_category_iso_functor_category] at h ⊢,
+--     rw ← h,
+--     symmetry, rw ← category.assoc, delta cokernel.map,
+--     refine eq.trans (congr_arg2 _ (limits.cokernel.π_desc _ _ _) (refl m)) _,
+--     exact category.assoc _ _ _ }
+-- end.
+
+-- noncomputable
+-- def coker_proj_functor (V : Type*) [category V] [has_zero_morphisms V] [has_cokernels V]
+--   : arrow V ⥤ arrow V :=
+--   mk_arrow_diagram (coker_functor_proj V)
+
+-- noncomputable
+-- instance coker_proj_preserves_coprod {V : Type u} [category.{(max u'' v)} V] [has_zero_morphisms V]
+--   [has_colimits V] {J : Type u''} (f : J → arrow V)
+--   : limits.preserves_colimit (discrete.functor f) (coker_proj_functor V) :=
+-- begin
+--   apply category_theory.limits.preserves_colimits_of_equiv_codomain (coker_proj_functor V)
+--           (category_theory.iso_to_equiv (arrow_category_iso_functor_category V)),
+--   constructor, intros c hc,
+--   apply evaluation_jointly_reflects_colimits,
+--   intro k, 
+--   cases k,
+--   { revert hc c,
+--     suffices : limits.preserves_colimit (discrete.functor f) arrow.right_func,
+--     { exact this.preserves },
+--     apply category_theory.limits.preserves_colimits_of_equiv_domain arrow.right_func
+--             (category_theory.iso_to_equiv (arrow_category_iso_functor_category V)),
+--     apply_with preserves_colimits_of_shape.preserves_colimit {instances:=ff}, 
+--     apply_with preserves_colimits_of_size.preserves_colimits_of_shape {instances:=ff}, 
+--     apply_with preserves_colimits_of_size_shrink {instances:=ff},
+--     change preserves_colimits ((evaluation _ V).obj walking_arrow.target),
+--     apply_instance },
+--   { change is_colimit ((coker_functor V).map_cocone c),
+--     revert hc c,
+--     suffices : limits.preserves_colimit (discrete.functor f) (coker_functor V),
+--     { exact this.preserves },
+--     apply_instance }
+-- end
+
+-- noncomputable
+-- def ker_functor (V : Type*) [category V] [has_zero_morphisms V] [has_kernels V]
+--   : arrow V ⥤ V := {
+--     obj := λ f, kernel f.hom,
+--     map := λ f g φ, kernel.map _ _ _ _ φ.w.symm,
+--     map_id' := by { intro, ext, simp, apply category.comp_id },
+--     map_comp' := by { intros, ext, simp }
+--   }.
+
+-- lemma ker_map_spec {V : Type*} [category V] [has_zero_morphisms V] [has_kernels V]
+--   {A B X Y : V}
+--   (i : A ⟶ X) (j : B ⟶ Y)
+--   (f' : A ⟶ B) (f : X ⟶ Y)
+--   (w1 : i ≫ f = f' ≫ j)
+--   : kernel.map i j f' f w1 ≫ kernel.ι j = kernel.ι i ≫ f' :=
+--   by { delta kernel.ι equalizer.ι kernel.map, simp }
+
+-- noncomputable
+-- def ker_functor_incl (V : Type*) [category V] [has_zero_morphisms V] [has_kernels V]
+--   : ker_functor V ⟶ arrow.left_func := {
+--     app := λ f, kernel.ι f.hom,
+--     naturality' := λ f g ϕ, by { dsimp [ker_functor], simp }
+--   }
+
+-- -- Why can't lean synthesize the arrow_preadditive instance?
+-- instance ker_additive {V : Type*} [category V] [preadditive V] [has_kernels V]
+--   : @functor.additive _ _ _ _ arrow_preadditive _ (ker_functor V) :=
+--   ⟨by { rintros ⟨f⟩ ⟨g⟩ ⟨αl, αr⟩ ⟨βl, βr⟩, dsimp [ker_functor], ext, simp }⟩.
+
+-- noncomputable
+-- instance ker_preserves_coprod {V : Type u} [category.{(max u'' v)} V] [has_zero_morphisms V]
+--   [has_colimits V] [has_kernels V] {J : Type u''} (f : J → arrow V)
+--   : limits.preserves_colimit (discrete.functor f) (ker_functor V) :=
+-- begin
+--   apply preserves_colim_into_arrow_category, intros,
+--   refine ⟨_, _, _⟩,
+--   { intro s,
+--      }
+--   -- { intro s, 
+--   --    -- we're pulling back by the natural transformation cod -> coker_functor.proj, I think?
+--   --   let s' := (cocones.precompose (whisker_left (discrete.functor f) (coker_functor_proj V))).obj s,
+--   --   refine cokernel.desc _ (hc2.desc s') _, 
+--   --   dsimp [category_theory.iso_to_equiv, arrow_category_iso_functor_category],
+--   --   let s'' : cocone (discrete.functor f ⋙ arrow.left_func) 
+--   --           := { X := s.X, ι := { app := λ j, 0, naturality' := by { intros, simp, } } },
+--   --   transitivity hc1.desc s'',
+--   --   { refine hc1.uniq s'' _ _,
+--   --     rintro ⟨j⟩, dsimp,
+--   --     rw [← category.assoc],
+--   --     change (c1.ι.app ⟨j⟩ ≫ hc1.desc ((cocones.precompose (whisker_left (discrete.functor f) arrow.left_to_right)).obj c2)) ≫ hc2.desc s' = 0,
+--   --     rw hc1.fac,
+--   --     dsimp, rw category.assoc,
+--   --     rw hc2.fac,
+--   --     dsimp [s', coker_functor_proj],
+--   --     rw ← category.assoc, simp },
+--   --   { refine eq.symm (hc1.uniq s'' _ _),
+--   --     intro, exact comp_zero } },
+--   -- { intros s j,
+--   --   dsimp [coker_functor, category_theory.iso_to_equiv, arrow_category_iso_functor_category],
+--   --   ext, simp, 
+--   --   exact hc2.fac _ _ },
+--   -- { intros s m h,
+--   --   dsimp [coker_functor, category_theory.iso_to_equiv, arrow_category_iso_functor_category],
+--   --   ext,
+--   --   refine eq.trans _ (eq.symm (category_theory.limits.cokernel.π_desc _ _ _)),
+--   --   let s' := (cocones.precompose (whisker_left (discrete.functor f) (coker_functor_proj V))).obj s,
+--   --   refine hc2.uniq s' _ _,
+--   --   intro j, specialize h j,
+--   --   simp at ⊢ h,
+--   --   dsimp [coker_functor,
+--   --          category_theory.iso_to_equiv, arrow_category_iso_functor_category] at h ⊢,
+--   --   rw ← h,
+--   --   symmetry, rw ← category.assoc, delta cokernel.map,
+--   --   refine eq.trans (congr_arg2 _ (limits.cokernel.π_desc _ _ _) (refl m)) _,
+--   --   exact category.assoc _ _ _ }
+-- end.
+
+-- -- noncomputable
+-- -- def im_functor (V : Type*) [category V] [has_images V] [has_image_maps V]
+-- --   : arrow V ⥤ V := {
+-- --     obj := λ f, image f.hom,
+-- --     map := λ f g φ, image.map φ,
+-- --     map_id' := λ _, limits.image.map_id _,
+-- --     map_comp' := λ _ _ _ _ _, limits.image.map_comp _ _,
+-- --   }
+
+-- -- noncomputable
+-- -- def im_functor_incl (V : Type*) [category V] [has_images V] [has_image_maps V]
+-- --   : im_functor V ⟶ arrow.right_func := {
+-- --     app := λ _, image.ι _,
+-- --     naturality' := λ _ _ _, limits.image.map_ι _
+-- --   }
+
+-- -- noncomputable
+-- -- def im_functor_proj (V : Type*) [category V] [has_images V] [has_image_maps V]
+-- --   : arrow.left_func ⟶ im_functor V := {
+-- --     app := λ _, limits.factor_thru_image _,
+-- --     naturality' := λ _ _ _, (limits.image_map.factor_map _ _).symm
+-- --   }
+
+-- -- instance im_additive {V : Type*} [category V] [preadditive V] [has_images V] [has_image_maps V]
+-- --   : @functor.additive _ _ _ _ arrow_preadditive _ (im_functor V) :=
+-- --   ⟨by { rintros ⟨f⟩ ⟨g⟩ ⟨αl, αr⟩ ⟨βl, βr⟩, dsimp [im_functor], refine (cancel_mono (image.ι _)).mp _, simp }⟩.
+
+-- -- I think we need abelian so that image f = ker (coker f)
+-- -- noncomputable
+-- -- instance im_preserves_coprod {V : Type u} [category.{v} V] [abelian V]
+-- --   [has_colimits V] {J : Type} (f : J → arrow V)
+-- --   : limits.preserves_colimit (discrete.functor f) (im_functor V) :=
+-- -- begin
+-- --   apply preserves_colim_into_arrow_category, intros,
+-- --   refine ⟨_, _, _⟩,
+-- --   { intro s,
+-- --     dsimp [mk_arrow_cocone, im_functor, cocones.precompose, whisker_left],
+-- --      }
+-- -- end
+
+-- noncomputable
+-- def homological_complex.boundaries_to_cycles_functor {ι : Type*} (V : Type*) [category V]
+--   [has_zero_morphisms V] [has_zero_object V] (c : complex_shape ι)
+--   [has_equalizers V] [has_images V] [has_image_maps V] [has_cokernels V] (i : ι)
+--   : homological_complex V c ⥤ arrow V := {
+--     obj := λ C, C.boundaries_to_cycles i,
+--     map := λ C D f, arrow.hom_mk (boundaries_to_cycles_naturality f i),
+--     map_comp' := λ X Y Z f g, comma_morphism.ext _ _ ((boundaries_functor V c i).map_comp _ _)
+--                                                      ((cycles_functor V c i).map_comp _ _),
+--     map_id' := λ X, comma_morphism.ext _ _ ((boundaries_functor V c i).map_id _)
+--                                            ((cycles_functor V c i).map_id _),
+--   }
+
+-- lemma homology_functor_eq_coker_of_boundaries_to_cycles
+--   {ι : Type*} (V : Type*) [category V]
+--   [has_zero_morphisms V] [has_zero_object V] (c : complex_shape ι)
+--   [has_equalizers V] [has_images V] [has_image_maps V] [has_cokernels V] (i : ι)
+--   : homology_functor V c i
+--   = homological_complex.boundaries_to_cycles_functor V c i ⋙ coker_functor V :=
+--   rfl.
+
+-- /-
+-- Roadmap:
+--   - Define image_functor Arr(C) ⥤ C
+--   - Argue `boundaries_functor i` is naturally isomorphic to the composition Ch(V) ⥤ Arr(V) ⥤ V
+--     where the first map picks out `d_to i` and the second is image_functor
+--   - Argue that the picking-out functor and the image functor preserve coproducts
+--   - This also helps with cycles_functor (we just need to know kernels preserve coproducts)
+-- -/
+-- instance boundaries_functor_preserves_coprod {ι : Type*} (V : Type*) [category V]
+--   [has_zero_morphisms V] [has_zero_object V] (c' : complex_shape ι)
+--   [has_equalizers V] [has_images V] [has_image_maps V] [has_colimits V] (i : ι)
+--   {J : Type} (f : J → homological_complex V c')
+--   : limits.preserves_colimit (discrete.functor f)
+--                              (boundaries_functor V c' i) :=
+-- begin
+--   destruct c'.prev i,
+--   { intro hi, constructor, intros c hc,
+--     have : ∀ C' : homological_complex V c', is_zero (C'.boundaries i : V),
+--     { intro,
+--       rw homological_complex.boundaries_eq_bot _ hi,
+--       refine is_zero_of_iso_of_zero _ subobject.bot_coe_iso_zero.symm,
+--       apply limits.is_zero_zero, },
+--     refine ⟨_, _, _⟩,
+--     { intro s, exact 0, },
+--     { intros s j, 
+--       refine eq.trans comp_zero _,
+--       apply limits.is_zero.eq_of_src,
+--       apply this },
+--     { intros s m hm,
+--       apply limits.is_zero.eq_of_src,
+--       apply this } },
+--   { rintros ⟨i', hi⟩ _,
+--     refine limits.preserves_colimit_of_preserves_colimit_cocone (colimit_complex_cocone_is_colimit _) _,
+--     refine ⟨_, _, _⟩,
+--     { intro s,
+--       refine (homological_complex.boundaries_iso_image _ hi).hom ≫ _,
+
+--       -- rw homological_complex.boundaries_eq_image_subobject _ hi, swap, assumption,
+--        } }
+-- end
+
+-- instance cycles_functor_preserves_coprod {ι : Type*} (V : Type*) [category V]
+--   [has_zero_morphisms V] [has_zero_object V] (c' : complex_shape ι)
+--   [has_equalizers V] [has_images V] [has_image_maps V] [has_colimits V] (i : ι)
+--   {J : Type} (f : J → homological_complex V c')
+--   : limits.preserves_colimit (discrete.functor f)
+--                              (cycles_functor V c' i) :=
+-- begin
+--   admit
+-- end
+
+-- noncomputable
+-- instance boundaries_to_cycles_preserves_coprod {ι : Type*} (V : Type*) [category V]
+--   [has_zero_morphisms V] [has_zero_object V] (c' : complex_shape ι)
+--   [has_equalizers V] [has_images V] [has_image_maps V] [has_colimits V] (i : ι)
+--   {J : Type} (f : J → homological_complex V c')
+--   : limits.preserves_colimit (discrete.functor f)
+--                              (homological_complex.boundaries_to_cycles_functor V c' i) :=
+-- begin
+--   refine category_theory.limits.preserves_colimits_of_equiv_codomain
+--            (homological_complex.boundaries_to_cycles_functor V c' i)
+--            (category_theory.iso_to_equiv (arrow_category_iso_functor_category V)) _,
+--   constructor, intros c hc,
+--   apply limits.evaluation_jointly_reflects_colimits,
+--   intro k, cases k,
+--   { change is_colimit ((boundaries_functor V c' i).map_cocone c),
+--     apply limits.is_colimit_of_preserves, assumption },
+--   { change is_colimit ((cycles_functor V c' i).map_cocone c),
+--     apply limits.is_colimit_of_preserves, assumption },
+-- end
+
+-- noncomputable
+-- def homology_functor_iso_coker_of_boundaries_to_cycles
+--   {ι : Type*} (V : Type*) [category V]
+--   [has_zero_morphisms V] [has_zero_object V] (c : complex_shape ι)
+--   [has_equalizers V] [has_images V] [has_image_maps V] [has_cokernels V] (i : ι)
+--   : homology_functor V c i
+--   ≅ homological_complex.boundaries_to_cycles_functor V c i ⋙ coker_functor V :=
+--   iso.refl _.
+
 
 section snake_diagram 
 
@@ -176,8 +471,6 @@ lemma coker_of_cocartesian_square_is_iso {V : Type*} [category V] [abelian V] {X
                { simp, symmetry, exact cokernel.condition _ } }⟩⟩
 
 section general_abelian_category
-
-universes u u' v v'
 
 parameters {C : Type u} {V : Type v} [category.{u'} C] [category.{v'} V]
 parameters {ι : Type} {c : complex_shape ι}
@@ -388,13 +681,13 @@ lemma δ_natural' [abelian V]
   δ f g H1 p q hpq ≫ (homology_functor _ _ q).map α =
     (homology_functor _ _ p).map γ ≫ δ f' g' H2 p q hpq :=
   let α' : walking_arrow ⥤ homological_complex V c :=
-          arrow_category_iso_functor_category.hom.obj (arrow.mk α),
+          (arrow_category_iso_functor_category _).hom.obj (arrow.mk α),
       β' : walking_arrow ⥤ homological_complex V c :=
-          arrow_category_iso_functor_category.hom.obj (arrow.mk β),
+          (arrow_category_iso_functor_category _).hom.obj (arrow.mk β),
       γ' : walking_arrow ⥤ homological_complex V c :=
-          arrow_category_iso_functor_category.hom.obj (arrow.mk γ),
-      F : α' ⟶ β' := arrow_category_iso_functor_category.hom.map (arrow.hom_mk w1),
-      G : β' ⟶ γ' := arrow_category_iso_functor_category.hom.map (arrow.hom_mk w2) in
+          (arrow_category_iso_functor_category _).hom.obj (arrow.mk γ),
+      F : α' ⟶ β' := (arrow_category_iso_functor_category _).hom.map (arrow.hom_mk w1),
+      G : β' ⟶ γ' := (arrow_category_iso_functor_category _).hom.map (arrow.hom_mk w2) in
   have H : Π (x : walking_arrow) ℓ, short_exact ((F.app x).f ℓ) ((G.app x).f ℓ),
   by { intros, cases x, { exact H1 ℓ }, { exact H2 ℓ } },
   by { have := δ_natural F G H walking_arrow_hom.arr p q hpq, exact this }
@@ -549,8 +842,6 @@ end general_abelian_category
 
 section chain_complex
 
-universes u u' v v'
-
 parameters {C : Type u} {V : Type v} [category.{u'} C] [category.{v'} V]
 parameters [preadditive V] [has_equalizers V] [has_images V] [has_image_maps V] [has_cokernels V]
 
@@ -628,8 +919,6 @@ instance [has_zero_object V] (C : chain_complex V ℕ)
 end chain_complex
 
 section Modules
-
-universes u u' v v'
 
 parameters {C : Type u} {R : Type v} [category.{u'} C] [comm_ring R]
 parameters {ι : Type} {c : complex_shape ι}
@@ -918,11 +1207,37 @@ begin
         delta homological_complex.d_to, rw hi } } }
 end
 
+noncomputable
+def Module.to_cycles_terminal_hom {X : homological_complex (Module.{v'} R) c} {i : ι}
+  (hi : c.next i = none) : X.X i ⟶ Module.of R (linear_map.ker (X.d_from i)) :=
+  linear_map.cod_restrict (linear_map.ker (X.d_from i)) linear_map.id
+                          (by { intro x, rw X.d_from_eq_zero hi, simp })
+
+lemma Module.homology_iso_cokernel_spec {C : homological_complex (Module.{v'} R) c} {i : ι}
+  (hi : c.next i = none) 
+  : cokernel.π (C.d_to i) ≫ (homology_iso_cokernel i hi C).inv
+  = Module.to_cycles_terminal_hom hi
+  ≫ Module.as_hom_right (is_linear_map.mk' _ (Module.to_homology.homomorphism C i)) :=
+begin
+  rw Module.to_homology_def,
+  dsimp [Module.as_hom_right],
+  simp [homology_iso_cokernel],
+  apply homology.hom_to_ext,
+  simp,
+  rw ← homology.π'_eq_π,
+  rw category.assoc,
+  simp,
+  symmetry,
+  repeat { rw ← category.assoc },
+  convert category.id_comp _,
+  ext, delta Module.to_cycles,
+  simp [Module.to_cycles_terminal_hom, is_linear_map.mk'],
+end
+
 end Modules
 
 section retract
 
-universes v v'
 parameters {R : Type v} [comm_ring R]
 parameters {ι : Type} {c : complex_shape ι}
 
@@ -1107,8 +1422,6 @@ end
 end retract
 
 section Modules
-
-universes u u' v v'
 
 parameters {C : Type u} {R : Type v} [category.{u'} C] [comm_ring R]
 parameters {ι : Type} {c : complex_shape ι}

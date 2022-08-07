@@ -1828,40 +1828,6 @@ begin
 end.
 
 -- move this to homological algebra
-lemma is_pullback_of_is_is_pullback_eval {V : Type*} [category_theory.category V]
-  [category_theory.limits.has_zero_morphisms V] {ι : Type*} {c : complex_shape ι}
-  {W X Y Z : homological_complex V c} (f : W ⟶ X) (g : W ⟶ Y) (h : X ⟶ Z) (i : Y ⟶ Z)
-  (H : ∀ n, category_theory.is_pullback (f.f n) (g.f n) (h.f n) (i.f n))
-  : category_theory.is_pullback f g h i :=
-begin
-  refine category_theory.is_pullback.of_is_limit' _ _,
-  { constructor, ext n, dsimp, exact (H n).to_comm_sq.w },
-  { apply homological_complex.is_limit_of_is_limit_eval, intro n,
-    have functors_eq : category_theory.limits.cospan h i ⋙ homological_complex.eval V c n
-                     = category_theory.limits.cospan (h.f n) (i.f n),
-    { refine category_theory.functor.hext _ _,
-      { intro ℓ, cases ℓ; try { cases ℓ }; refl },
-      { intros ℓ ℓ' a, cases a,
-        { cases ℓ; try { cases ℓ }; refl },
-        { cases a_1; refl } } },
-    convert (H n).is_limit,
-    { simp [category_theory.comm_sq.cone, category_theory.is_pullback.cone,
-            category_theory.functor.map_cone, category_theory.limits.cones.functoriality,
-            homological_complex.eval],
-      transitivity { category_theory.limits.cone .
-                     X := (category_theory.limits.pullback_cone.mk (f.f n) (g.f n) (H n).to_comm_sq.w).X,
-                     π := { app := (category_theory.limits.pullback_cone.mk (f.f n) (g.f n) (H n).to_comm_sq.w).π.app,
-                            naturality' := (category_theory.limits.pullback_cone.mk (f.f n) (g.f n) (H n).to_comm_sq.w).π.naturality' } },
-      { congr,
-        { assumption },
-        { assumption },
-        { ext, refl,
-          intros ℓ ℓ' hℓ, cases hℓ, 
-          cases ℓ; try { cases ℓ }; refl },
-        { apply proof_irrel_heq } },
-      { apply heq_of_eq, congr } } }
-end
-
 lemma is_pushout_of_is_is_pushout_eval {V : Type*} [category_theory.category V]
   [category_theory.limits.has_zero_morphisms V] {ι : Type*} {c : complex_shape ι}
   {W X Y Z : homological_complex V c} (f : W ⟶ X) (g : W ⟶ Y) (h : X ⟶ Z) (i : Y ⟶ Z)

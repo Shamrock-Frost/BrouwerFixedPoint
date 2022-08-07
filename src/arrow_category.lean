@@ -2,6 +2,7 @@ import category_theory.arrow category_theory.category.Cat category_theory.abelia
 import category_theory.limits.shapes.functor_category category_theory.limits.preserves.shapes.zero
 import category_theory.abelian.functor_category
 import algebra.homology.homology
+import .category_theory
 
 open category_theory
 
@@ -58,7 +59,7 @@ def walking_arrow.commutative_square_to_nat_trans_app {C : Type*} [category C] {
 | source := u
 | target := v
 
-def arrow_category_iso_functor_category {C : Type*} [category C]
+def arrow_category_iso_functor_category (C : Type*) [category C]
   : Cat.of (arrow C) ≅ Cat.of (walking_arrow ⥤ C) := {
   hom := {
     obj := λ f, walking_arrow.morphism_to_functor f.hom,
@@ -97,13 +98,10 @@ def arrow_category_iso_functor_category {C : Type*} [category C]
 
 instance arrow_has_finite_limits {C : Type*} [category C] [limits.has_finite_limits C]
   : limits.has_finite_limits (arrow C) :=
-  ⟨λ J i1 i2, @adjunction.has_limits_of_shape_of_equivalence (walking_arrow ⥤ C) _ (arrow C) _ J i1
-                                                             arrow_category_iso_functor_category.hom
-                                                             ⟨arrow_category_iso_functor_category.inv,
-                                                              eq_to_iso (eq.symm (arrow_category_iso_functor_category.hom_inv_id)),
-                                                              eq_to_iso (arrow_category_iso_functor_category.inv_hom_id),
-                                                              by { intro, cases X, simp, refl }⟩
-                                                            (@limits.has_finite_limits.out _ _ limits.functor_category_has_finite_limits J i1 i2)⟩.
+  ⟨λ J i1 i2,  @adjunction.has_limits_of_shape_of_equivalence (walking_arrow ⥤ C) _ (arrow C) _ J i1
+                                                              (category_theory.iso_to_equiv (arrow_category_iso_functor_category C)).functor
+                                                              _
+                                                              (@limits.has_finite_limits.out _ _ limits.functor_category_has_finite_limits J i1 i2)⟩.
 
 
 instance {A : Type*} [category A] [preadditive A] {B : Type*} [category B] [preadditive B]
@@ -152,16 +150,83 @@ category_theory.comma.category_theory.preadditive.
 instance arrow_iso_functor_preserves_zero {V : Type*} [category V] [preadditive V]
   : @functor.preserves_zero_morphisms (arrow V) _ (walking_arrow ⥤ V) _
                                       (@preadditive.preadditive_has_zero_morphisms _ _ arrow_preadditive) _
-                                      arrow_category_iso_functor_category.hom :=
+                                      (arrow_category_iso_functor_category V).hom :=
   ⟨by { intros f g, ext i, cases i; refl }⟩
 
 noncomputable
 instance arr_ab {V : Type*} [category V] [abelian V] : abelian (arrow V) := 
   @abelian_of_equivalence _ _ arrow_preadditive _ 
                           (walking_arrow ⥤ V) _ _ 
-                          arrow_category_iso_functor_category.hom
-                          arrow_iso_functor_preserves_zero
-                          ⟨arrow_category_iso_functor_category.inv,
-                           eq_to_iso (eq.symm (arrow_category_iso_functor_category.hom_inv_id)),
-                           eq_to_iso (arrow_category_iso_functor_category.inv_hom_id),
-                           by { intro, cases X, simp, refl }⟩
+                          (category_theory.iso_to_equiv (arrow_category_iso_functor_category V)).functor
+                          arrow_iso_functor_preserves_zero _.
+
+universes v' v u'' u' u
+open category_theory.limits
+
+def mk_arrow_diagram {C : Type u} [category.{v} C] 
+  {J : Type*} [category J] {K1 K2 : J ⥤ C} (η : K1 ⟶ K2)
+  : J ⥤ arrow C := {
+    obj := λ j, arrow.mk (η.app j),
+    map := λ i j f, arrow.hom_mk' (η.naturality f)
+  }.
+
+def mk_arrow_cocone {C : Type u} [category.{v} C] 
+  {J : Type*} [category J] (K1 K2 : J ⥤ C) (η : K1 ⟶ K2)
+  {c1 : cocone K1} (hc1 : is_colimit c1) (c2 : cocone K2)
+  : cocone (mk_arrow_diagram η) := {
+    X := hc1.desc ((cocones.precompose η).obj c2),
+    ι := { app := λ j, arrow.hom_mk' (eq.trans (hc1.fac _ j) (congr_fun (congr_arg _ (cocones.precompose_obj_ι η c2)) j)),
+           naturality' := by { intros, ext; dsimp [mk_arrow_diagram]; simp } }
+  }.
+
+noncomputable
+def preserves_colim_into_arrow_category {C : Type u} [category.{(max u'' v)} C] 
+  {D : Type u'} [category.{v'} D] (F : arrow C ⥤ D)
+  {J : Type u''} [small_category J] {K : J ⥤ arrow C}
+  [has_colimits C]
+  (H : ∀ {c1 : cocone (K ⋙ arrow.left_func)} (hc1 : is_colimit c1)
+         {c2 : cocone (K ⋙ arrow.right_func)} (hc2 : is_colimit c2),
+         is_colimit (F.map_cocone (mk_arrow_cocone (K ⋙ arrow.left_func) (K ⋙ arrow.right_func)
+                                                   (whisker_left K arrow.left_to_right) hc1 c2)))
+  : preserves_colimit K F :=
+begin
+  let e := category_theory.iso_to_equiv (arrow_category_iso_functor_category C),
+  refine category_theory.limits.preserves_colimits_of_equiv_domain _ e _,
+  constructor, intros c hc,
+  let h := λ k,
+          @preserves_colimits_of_shape.preserves_colimit _ _ _ _ _ _ _
+            (@preserves_colimits_of_size.preserves_colimits_of_shape _ _ _ _ _
+              (@limits.preserves_colimits_of_size_shrink _ _ _ _ _
+                (@limits.evaluation_preserves_colimits C _ walking_arrow _ _ k)) J _)
+            (K ⋙ e.functor),
+  let hSource := @limits.is_colimit_of_preserves _ _ _ _ _ _ _ _ _ hc (h walking_arrow.source),
+  let hTarget := @limits.is_colimit_of_preserves _ _ _ _ _ _ _ _ _ hc (h walking_arrow.target),
+  refine is_colimit.of_iso_colimit _ (functor.map_cocone_comp' (K ⋙ e.functor) e.inverse F c).symm,
+  convert H hSource hTarget,
+  dsimp [mk_arrow_cocone, mk_arrow_diagram, functor.map_cocone,
+          cocones.functoriality, cocones.precompose],
+  have : ∀ h, c.X.map arr
+            = hSource.desc { X := c.X.obj target,
+                             ι := @whisker_left J _ (arrow C) _ C _ K _ _ arrow.left_to_right
+                                  ≫ { app := λ (j : J), (c.ι.app j).app target,
+                                      naturality' := h }},
+  { intro h, refine hSource.hom_ext _, intro j,
+    rw hSource.fac,
+    symmetry,
+    simp,
+    refine eq.trans _ ((c.ι.app j).naturality arr),
+    refl },
+  congr,
+  { dsimp [e, category_theory.iso_to_equiv, arrow_category_iso_functor_category],
+    congr,
+    apply this },
+  { dsimp [e, category_theory.iso_to_equiv, arrow_category_iso_functor_category,
+           functor.associator, category_struct.comp, nat_trans.vcomp],
+    congr,
+    { apply this },
+    { ext, refl, intros j j' h, cases h, rw category.id_comp _, congr,
+      { apply this },
+      { apply this },
+      { apply proof_irrel_heq } },
+    { apply proof_irrel_heq } }
+end.

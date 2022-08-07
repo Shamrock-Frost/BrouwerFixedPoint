@@ -101,3 +101,22 @@ noncomputable
 lemma convex.contraction (hs : convex ℝ s)
   : Π (x0 : s), (continuous_map.id s).homotopy (continuous_map.const s x0)
 | ⟨x0, h⟩ := (hs.star_convex h).contraction ⟨x0, h⟩
+
+noncomputable
+def embedding.pullback {α β γ : Type*} [topological_space α] [topological_space β]
+  [topological_space γ] {f : α → β} (hf : embedding f) (g : C(γ, β))
+  (hg : set.range g ⊆ set.range f) : C(γ, α) := {
+    to_fun := λ x, classical.some (hg (set.mem_range_self x)),
+    continuous_to_fun := by {
+      refine hf.continuous_iff.mpr _,
+      apply continuous.congr g.continuous_to_fun,
+      intro x, symmetry, exact classical.some_spec (hg (set.mem_range_self x))
+    }
+  }
+
+lemma embedding.pullback_spec {α β γ : Type*} [topological_space α] [topological_space β]
+  [topological_space γ] {f : α → β} (hf : embedding f) (g : C(γ, β))
+  (hg : set.range g ⊆ set.range f) : ∀ x, f (hf.pullback g hg x) = g x :=
+begin
+  intro x, exact classical.some_spec (hg (set.mem_range_self x))
+end
