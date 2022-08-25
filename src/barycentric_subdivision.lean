@@ -83,7 +83,7 @@ lemma spanned_by_sat_basis_apply (R : Type*) [comm_ring R] (M : Type*) [add_comm
                                  : spanned_by_sat_basis R M b s ⟨i, hi⟩
                                  = ⟨b i, submodule.subset_span (set.mem_image_of_mem b hi)⟩ :=
 begin
-  apply subtype.eq, simp [spanned_by_sat_basis]
+  apply subtype.eq, simp [spanned_by_sat_basis],
 end
 
 def subcomplex_spanned_by (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}
@@ -483,8 +483,12 @@ lemma simplex_category.to_Top'_map_comp_affine
   : simplex_category.to_Top'.map f ≫ singular_simplex_of_vertices vertices
   = singular_simplex_of_vertices (λ j, vertices (f j)) :=
 begin
-  ext p : 1, simp [simplex_category.to_Top'_map, singular_simplex_of_vertices, convex_combination],
-  ext k, simp, simp_rw finset.sum_mul,
+  ext p k, 
+  delta simplex_category.to_Top',
+  dsimp [continuous_map.has_coe_to_fun],
+  simp only [simplex_category.to_Top'_map, singular_simplex_of_vertices],
+  dsimp [continuous_map.has_coe_to_fun, convex_combination],
+  simp, simp_rw finset.sum_mul,
   refine eq.trans _ 
          (@finset.sum_fiberwise_of_maps_to _ _ _ _ _ finset.univ finset.univ
                                            f (λ _ _, finset.mem_univ _)

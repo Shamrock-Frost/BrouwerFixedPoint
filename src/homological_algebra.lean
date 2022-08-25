@@ -1207,6 +1207,25 @@ begin
         delta homological_complex.d_to, rw hi } } }
 end
 
+lemma Module.chain_complex_cokernel_π_zero_of_in_range
+  {X Y : homological_complex (Module.{v'} R) c} (f : X ⟶ Y) {i : ι} (y : Y.X i)
+  (h : y ∈ linear_map.range (f.f i)) : (cokernel.π f).f i y = 0 :=
+begin
+  convert (_ : cofork.π (coker_of_chain_map_at f i) y = 0),
+  { dsimp [coker_of_chain_map_at, parallel_pair_comp.cocone_comp_to_cocone_pair],
+    delta cofork.π, simp },
+  { let F := colimit.iso_colimit_cocone ⟨_, coker_of_chain_map_at_is_colimit f i⟩,
+    suffices : F.inv (cofork.π (coker_of_chain_map_at f i) y) = 0,
+    { convert congr_arg F.hom this; simp },
+    dsimp [F, colimit.iso_colimit_cocone, is_colimit.cocone_point_unique_up_to_iso],
+    rw ← comp_apply,
+    simp,
+    refine eq.trans _ (map_zero (cokernel.π (f.f i))),
+    obtain ⟨x, H⟩ := h,
+    refine Module.cokernel_π_ext' (f.f i) x _,
+    rw H, symmetry, exact zero_add y }
+end
+
 noncomputable
 def Module.to_cycles_terminal_hom {X : homological_complex (Module.{v'} R) c} {i : ι}
   (hi : c.next i = none) : X.X i ⟶ Module.of R (linear_map.ker (X.d_from i)) :=
