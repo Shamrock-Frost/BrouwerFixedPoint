@@ -1,3 +1,4 @@
+import for_mathlib.homology
 import .barycentric_subdivision .reduced_homology
 
 -- Should rework this so everything is a subset of ℝ^(n+1) and we just intersect
@@ -761,6 +762,15 @@ def preim_of_subset_homeo_subset {α : Type*} [topological_space α] {S T : set 
     right_inv := λ p, subtype.eq rfl
   }.
 
+lemma boundary_inclusion_mono_on_chains {R : Type*} [comm_ring R] (k : ℕ)
+  : mono ((singular_chain_complex R).map (topological_simplex_boundary_incl_topological_simplex k)) :=
+begin
+  apply_with homological_complex.mono_of_eval {instances:=ff}, 
+  intro i, refine (Module.mono_iff_injective _).mpr _,
+  apply singular_chain_complex_map_inj,
+  apply set.inclusion_injective
+end  
+
 noncomputable
 def homology_rel_boundary_iso_homology_of_boundary {R : Type*} [comm_ring R] [nontrivial R] (n k : ℕ) (hk : k > 0)
   : (singular_homology R k).obj (Top.of (topological_simplex_boundary (n + 1)))
@@ -1055,10 +1065,10 @@ begin
   obtain ⟨h4⟩ := coker_of_quasi_isos_between_monic_arrows_is_quasi_iso
                   ((singular_chain_complex R).map (topological_simplex_boundary_incl_topological_simplex n))
                   (@category_theory.functor.map _ _ _ _ (singular_chain_complex R) (Top.of s2) (Top.of (topological_simplex_boundary_minus_top_vertex (n + 1))) g5)
-                  _ _
+                  (boundary_inclusion_mono_on_chains n) _
                   ((singular_chain_complex R).map g4)
                   ((singular_chain_complex R).map g3) _ _ _,
-  any_goals
+  swap,
   { apply_with homological_complex.mono_of_eval {instances:=ff}, 
     intro i, refine (Module.mono_iff_injective _).mpr _,
     apply singular_chain_complex_map_inj,
@@ -1143,28 +1153,41 @@ begin
   refine @category_theory.as_iso _ _ _ _ _ (h3 k),
 end.
 
-lemma homology_of_boundary_of_zero_simplex {R : Type*} [comm_ring R] [nontrivial R] (k : ℕ)
-  : category_theory.limits.is_zero
-      ((singular_homology R k).obj (Top.of (topological_simplex_boundary 0))) :=
+lemma boundary_of_zero_simplex_empty : is_empty (topological_simplex_boundary 0) :=
+⟨begin
+  rintro ⟨p, ⟨_, h⟩, i, h'⟩,
+  have : finset.sum {(0 : fin 1)} p = 1, { refine eq.trans _ h, congr },
+  rw finset.sum_singleton at this, change fin 1 at i, fin_cases i,
+  exact zero_ne_one (h'.symm.trans this)
+end⟩.
+
+lemma singular_chain_complex_of_empty {R : Type*} [comm_ring R] (A : Top) (h : is_empty A) (k : ℕ)
+  : limits.is_zero (((singular_chain_complex R).obj A).X k) :=
 begin
-  have : topological_simplex_boundary 0 = ∅,
-  { ext p, simp, rintro ⟨⟨_, h⟩, i, h'⟩, 
-    have : finset.sum {(0 : fin 1)} p = 1, { refine eq.trans _ h, congr },
-    rw finset.sum_singleton at this, change fin 1 at i, fin_cases i,
-    exact zero_ne_one (h'.symm.trans this) },
-  rw this,
+  apply_with Module.is_zero_of_subsingleton {instances:=ff},
+  dsimp [singular_chain_complex, free_complex_on_sset, Top.to_sSet'],
+  suffices : is_empty (Top.of ↥((simplex_category.mk k).to_Top'_obj) ⟶ A),
+  { obtain ⟨h⟩ := this, constructor, intros a b, ext f, exfalso, exact h f },
+  constructor, rintro ⟨f, _⟩, exact is_empty.false (f (vertex k 0))
+end
+
+lemma homology_of_empty {R : Type*} [comm_ring R] (A : Top) (h : is_empty A) (k : ℕ)
+  : limits.is_zero ((singular_homology R k).obj A) :=
+begin
   apply_with Module.is_zero_of_subsingleton {instances:=ff},
   apply_with (@function.surjective.subsingleton _ _ Module.to_homology _ _) {instances:=ff},
   { apply_with subtype.subsingleton {instances:=ff},
-    dsimp [singular_chain_complex, free_complex_on_sset, Top.to_sSet'],
-    suffices : is_empty (Top.of ↥((simplex_category.mk k).to_Top'_obj) ⟶ Top.of (∅ :set (fin 1 → ℝ))),
-    { obtain ⟨h⟩ := this, constructor, intros a b, ext f, exfalso, exact h f },
-    constructor, rintro ⟨f, _⟩,
-    let := f (vertex k 0),
-    exact this.property },
+    refine subsingleton_of_forall_eq 0 _,
+    apply all_eq_zero_of_iso_zero,
+    refine ⟨limits.is_zero.iso_zero _⟩,
+    apply singular_chain_complex_of_empty, exact h },
   { intro y, obtain ⟨x, hx, H⟩ := homological_complex.exists_preim_homology_class _ y,
     exact ⟨⟨x, hx⟩, H⟩ }
-end.
+end
+
+lemma homology_of_boundary_of_zero_simplex {R : Type*} [comm_ring R] [nontrivial R] (k : ℕ)
+  : limits.is_zero ((singular_homology R k).obj (Top.of (topological_simplex_boundary 0))) :=
+  homology_of_empty _ boundary_of_zero_simplex_empty _
 
 noncomputable
 def equiv_fin_two_of_exactly_two_elements {α : Type*} (x0 x1 : α)
@@ -1252,6 +1275,19 @@ begin
     left, refl, right, refl, refl }
 end.
 
+lemma zeroth_homology_of_boundary_of_one_simplex_spec {R : Type*} [comm_ring R] [nontrivial R]
+  : ∀ i,
+   (@zeroth_homology_of_boundary_of_one_simplex R _ _).inv (finsupp.single i 1)
+  = (singular_homology0_basis R (Top.of (topological_simplex_boundary 1)))
+    (quot.mk (path_setoid (topological_simplex_boundary 1)).r
+      ⟨(vertex 1 i).val, vertex_mem_boundary 1 zero_lt_one i⟩) :=
+begin
+  intro i, fin_cases i;
+  dsimp [zeroth_homology_of_boundary_of_one_simplex];
+  refine congr_arg _ _;
+  simp [equiv_fin_two_of_exactly_two_elements, finsupp.dom_lcongr]
+end
+
 -- Move this
 def Top.coprod_binary_cofan (X Y : Top.{u}) : limits.binary_cofan X Y :=
   @limits.binary_cofan.mk Top _ X Y (Top.of (X ⊕ Y)) ⟨sum.inl⟩ ⟨sum.inr⟩
@@ -1305,53 +1341,67 @@ instance preserves_binary_coproducts_of_preserves_finite_coproducts
   : ∀ {X Y : C}, limits.preserves_colimit (limits.pair X Y) F :=
   by { intros, specialize @H limits.walking_pair _, cases H, exact @H _ }
 
+lemma homology_rel_empty_iso_homology {R : Type*} [comm_ring R] {A X : Top} (i : A ⟶ X)
+  (h : is_empty A) (k : ℕ)
+  : is_iso ((singular_homology_of_base_to_of_pair R k).app (arrow.mk i)) :=
+begin
+  delta singular_homology_of_base_to_of_pair,
+  rw nat_trans.comp_app,
+  delta functor.associator,
+  unfold_projs,
+  dsimp, rw linear_map.comp_id,
+  apply_with quasi_iso.is_iso {instances:=ff},
+  apply_with quasi_iso_of_iso {instances:=ff},
+  dsimp [coker_functor_proj],
+  apply_with balanced.is_iso_of_mono_of_epi {instances:=ff},
+  { apply_instance },
+  { rw homological_complex.mono_iff_eval, intro n,
+    let H1 := coker_of_chain_map_at_is_colimit ((singular_chain_complex R).map i) n,
+    let F1 : limits.cokernel (((singular_chain_complex R).map i).f n)
+         ≅ (coker_of_chain_map_at ((singular_chain_complex R).map i) n).X :=
+      (limits.colimit.is_colimit _).cocone_point_unique_up_to_iso H1,
+    apply_with (mono_of_mono _ F1.inv) {instances:=ff},
+    simp [F1, limits.is_colimit.cocone_point_unique_up_to_iso],
+    convert @is_iso.mono_of_iso _ _ _ _ _ (limits.coequalizer.π_of_eq _),
+    { refine (iso.comp_inv_eq F1).mpr _,
+      simp [F1],
+      delta limits.cokernel.π limits.cofork.π limits.coequalizer.π,
+      dsimp [coker_of_chain_map_at, parallel_pair_comp.cocone_comp_to_cocone_pair], 
+      simp,
+      symmetry, exact category.id_comp _ },
+    { apply limits.is_zero.eq_of_src,
+      apply singular_chain_complex_of_empty,
+      exact h } },
+  { apply_instance }
+end
+
+lemma higher_homology_of_zero_simplex {R : Type*} [comm_ring R] (k : ℕ) (hk : 0 < k)
+  : limits.is_zero ((singular_homology R k).obj (Top.of (topological_simplex 0))) :=
+begin
+  refine limits.is_zero_of_iso_of_zero (limits.is_zero_zero _) _,
+  symmetry, refine nonempty.some _,
+  apply homology_of_contractible_space R _ _ k hk,
+  refine ⟨⟨homeomorph.to_homotopy_equiv ⟨_, _, _⟩⟩⟩,
+  { dsimp, exact equiv.equiv_punit (topological_simplex 0)},
+  { dsimp [equiv.equiv_punit, equiv.equiv_of_unique], continuity },
+  { dsimp [equiv.equiv_punit, equiv.equiv_of_unique], continuity }
+end
+
 lemma higher_homology_of_boundary_of_one_simplex {R : Type*} [comm_ring R] [nontrivial R]
   (k : ℕ) (hk : 0 < k)
   : limits.is_zero ((singular_homology R k).obj (Top.of (topological_simplex_boundary 1))) :=
 begin
-  let F := two_point_t2_space_homeo_coprod_two_points _ _ _ boundary_of_one_simplex_desc,
-  swap,
-  { intro h, apply @zero_ne_one ℝ,
-    refine eq.trans _ (eq.trans (congr_fun (congr_arg subtype.val h) 0).symm _),
-    { symmetry, exact vertex_coord_zero 1 (1 : fin 2) 0 fin.zero_ne_one.symm },
-    { exact vertex_coord_one 1 0 } },
-  refine limits.is_zero_of_iso_of_zero _
-           ((singular_homology R k).map_iso
-             (@Top.iso_of_homeo (Top.of (unit ⊕ unit))
-                                (Top.of (topological_simplex_boundary 1)) F)),
-  refine limits.is_zero_of_iso_of_zero _ ((singular_homology R k).map_iso _),
-  swap 3, exact Top.coprod_iso_coprod (Top.of unit) (Top.of unit),
-  letI : limits.preserves_colimit (limits.pair (Top.of unit) (Top.of unit)) (singular_homology R k),
-  { letI := @singular_chain_complex_preserves_coprod R _,
-    apply preserves_binary_coproducts_of_preserves_finite_coproducts,
-    intros, apply preserves_colimits_of_discrete_shape_of_preserves_colimit_of_discrete_functor,
-    intros, apply singular_homology_preserves_coprod },
-  obtain ⟨G⟩ := homology_of_contractible_space R (Top.of unit) ⟨⟨continuous_map.homotopy_equiv.refl _⟩⟩ k hk,
-  let i := limits.is_zero_of_iso_of_zero (limits.is_zero_zero _) G.symm,
-  refine limits.is_zero_of_iso_of_zero _ (limits.preserves_colimit_pair.iso _ _ _),
-  refine limits.is_zero_of_iso_of_zero (limits.is_zero_zero _)
-                                       (limits.has_zero_object.zero_iso_is_initial _),
-  apply_with limits.is_initial.of_unique {instances:=ff},
-  intro Y,
-  refine ⟨⟨limits.coprod.desc (i.to Y) (i.to Y)⟩, _⟩,
-  intro f, ext : 1; apply i.eq_of_src
+  refine limits.is_zero_of_iso_of_zero _ (iso.symm (homology_rel_boundary_iso_homology_of_boundary 0 k hk)),
+  refine limits.is_zero_of_iso_of_zero _ 
+          (@as_iso _ _ _ _ _ (homology_rel_empty_iso_homology _ _ _)),
+  { apply higher_homology_of_zero_simplex, exact hk },
+  { exact boundary_of_zero_simplex_empty }
 end.
 
--- should extract proof that ∂Δ^n is path connected for n > 1
-noncomputable
-def zeroth_homology_of_boundary_of_n_simplex {R : Type*} [comm_ring R] [nontrivial R] (n : ℕ)
-  (hn : n > 1) : (singular_homology R 0).obj (Top.of (topological_simplex_boundary n))
-  ≅ (Module.free R).obj (fin 1) :=
+lemma boundary_of_simplex_path_connected (n : ℕ) (hn : n > 1)
+  : path_connected_space (topological_simplex_boundary n) :=
 begin
-  refine linear_equiv.to_Module_iso'_left _,
-  apply_with (linear_equiv.trans (singular_homology0_basis R _).repr
-                                 (finsupp.dom_lcongr _)) {instances:=ff},
-  symmetry,
-  refine fin_one_equiv.trans (equiv.symm _),
-  apply_with equiv.equiv_punit {instances:=ff},
-  refine nonempty.some _,
-  rw [unique_iff_subsingleton_and_nonempty, and.comm, ← path_connected_space_iff_zeroth_homotopy,
-      path_connected_space_iff_eq],
+  rw path_connected_space_iff_eq,
   let v : fin (n + 1) → topological_simplex_boundary n
       := λ i, ⟨vertex n i, vertex_mem_boundary n (zero_lt_one.trans hn) i⟩,
   refine ⟨v 0, _⟩,
@@ -1396,5 +1446,273 @@ begin
       haveI := star_convex.contractible_space (topological_simplex_boundary_minus_interior_of_bottom_face_star_convex n)
                                               ⟨(v 0).val, this 0⟩,
       apply path_connected_space.joined } }
+end.
+
+-- should extract proof that ∂Δ^n is path connected for n > 1
+noncomputable
+def zeroth_homology_of_boundary_of_n_simplex {R : Type*} [comm_ring R] [nontrivial R] (n : ℕ)
+  (hn : n > 1) : (singular_homology R 0).obj (Top.of (topological_simplex_boundary n))
+  ≅ (Module.free R).obj (fin 1) :=
+begin
+  refine linear_equiv.to_Module_iso'_left _,
+  apply_with (linear_equiv.trans (singular_homology0_basis R _).repr
+                                 (finsupp.dom_lcongr _)) {instances:=ff},
+  symmetry,
+  refine fin_one_equiv.trans (equiv.symm _),
+  apply_with equiv.equiv_punit {instances:=ff},
+  refine nonempty.some _,
+  rw [unique_iff_subsingleton_and_nonempty, and.comm, ← path_connected_space_iff_zeroth_homotopy],
+  exact boundary_of_simplex_path_connected n hn
+end.
+
+noncomputable
+def first_homology_of_boundary_of_two_simplex {R : Type*} [comm_ring R] [nontrivial R]
+  : (singular_homology R 1).obj (Top.of (topological_simplex_boundary 2))
+  ≅ Module.of R R :=
+begin
+  refine iso.trans (homology_rel_boundary_iso_homology_of_boundary 1 1 zero_lt_one) _,
+  let i := (singular_chain_complex R).map (topological_simplex_boundary_incl_topological_simplex 1),
+  -- this comes up a lot, should probably be a lemma
+  haveI : mono i := boundary_inclusion_mono_on_chains 1,
+  let δ := homological_complex.δ i ((coker_functor_proj (chain_complex (Module R) ℕ)).app (arrow.mk i))
+                                   (coker_functor_degreewise_SES i) 1 0 rfl,
+  have LES : exact_seq (Module R) [arrow.mk ((homology_functor (Module R) (complex_shape.down ℕ) 1).map ((coker_functor_proj (chain_complex (Module R) ℕ)).app (arrow.mk i))),
+                                   arrow.mk δ, 
+                                   arrow.mk ((homology_functor (Module R) (complex_shape.down ℕ) 0).map i)] :=
+              (homological_complex.six_term_exact_seq i
+                 ((coker_functor_proj (chain_complex (Module R) ℕ)).app (arrow.mk i))
+                 (coker_functor_degreewise_SES i) 1 0 rfl).extract 1 3,
+  have hw := ((exact_iff_exact_seq _ _).mpr (LES.extract 1 2)).w,
+  letI := exact.mono_of_eq_zero ((exact_iff_exact_seq _ _).mpr (LES.extract 0 2)) _,
+  swap,
+  { apply limits.is_zero.eq_of_src, 
+    refine limits.is_zero_of_iso_of_zero (limits.is_zero_zero _) _,
+    symmetry, refine nonempty.some _,
+    apply homology_of_contractible_space R _ _ 1 zero_lt_one,
+    exact (convex_std_simplex ℝ (fin 2)).contractible_space ⟨(vertex 1 0).val, (vertex 1 0).property⟩ },
+  letI := (exact_iff_image_to_kernel'_is_iso _ _ hw).mp
+            ((exact_iff_exact_seq _ _).mpr (LES.extract 1 2)),
+  
+  refine (limits.image_mono_iso_source δ).symm
+         ≪≫ as_iso ((image_to_kernel' δ ((homology_functor (Module R) (complex_shape.down ℕ) 0).map i) hw))
+         ≪≫ Module.kernel_iso_ker _
+         ≪≫ linear_equiv.to_Module_iso'_right _,
+  symmetry,
+  let b := @zeroth_homology_of_boundary_of_one_simplex R _ _,
+  let v1 := b.inv (finsupp.single 0 1),
+  let v2 := b.inv (finsupp.single 1 1),
+  let x0 : topological_simplex_boundary 1 :=
+        ⟨(vertex 1 0).val, vertex_mem_boundary 1 zero_lt_one 0⟩,
+  let x1 : topological_simplex_boundary 1 :=
+      ⟨(vertex 1 (1 : fin 2)).val, vertex_mem_boundary 1 zero_lt_one (1 : fin 2)⟩,
+  have : v1 - v2 ∈ linear_map.ker ((homology_functor (Module R) (complex_shape.down ℕ) 0).map i),
+  { dsimp [v1, v2, b],
+    rw [zeroth_homology_of_boundary_of_one_simplex_spec, zeroth_homology_of_boundary_of_one_simplex_spec],
+    rw [linear_map.mem_ker, map_sub],
+    rw sub_eq_zero,
+    change (singular_homology R 0).map (topological_simplex_boundary_incl_topological_simplex 1)
+             (singular_homology0_basis R (Top.of (topological_simplex_boundary 1))
+               (quot.mk (path_setoid (topological_simplex_boundary 1)).r x0))
+           = (singular_homology R 0).map (topological_simplex_boundary_incl_topological_simplex 1)
+               (singular_homology0_basis R (Top.of (topological_simplex_boundary 1))
+                 (quot.mk (path_setoid (topological_simplex_boundary 1)).r x1)),
+    rw [singular_homology0_map_matrix, singular_homology0_map_matrix],
+    refine congr_arg _ _,
+    apply quot.sound,
+    apply_with path_connected_space.joined {instances:=ff},
+    apply_with contractible_space.path_connected_space {instances:=ff},
+    exact (convex_std_simplex ℝ (fin 2)).contractible_space ⟨(vertex 1 0).val, (vertex 1 0).property⟩ },
+  refine linear_equiv.of_bijective ⟨λ r, r • ⟨v1 - v2, this⟩, _, _⟩ _ _,
+  { intros, apply subtype.eq, apply add_smul, },
+  { intros, apply subtype.eq, simp, apply mul_smul },
+  { rw [← linear_map.ker_eq_bot, linear_map.ker_eq_bot'],
+    intros r hr, simp at hr,
+    have hr' : r • (v1 - v2) = 0 := congr_arg subtype.val hr,
+    rw smul_sub at hr',
+    dsimp [v1, v2] at hr',
+    rw [← map_smul, ← map_smul, ← map_sub] at hr',
+    replace hr' := congr_arg b.hom hr',
+    rw [← comp_apply, b.inv_hom_id, map_zero] at hr',
+    simp only [mul_one, finsupp.smul_single', Module.id_apply] at hr',
+    rw [sub_eq_zero, finsupp.single_eq_single_iff] at hr',
+    simp at hr',
+    exact hr' },
+  { rintro ⟨y, hy⟩,
+    dsimp,
+    suffices : ∃ a : R, a • (v1 - v2) = y, { cases this with a ha, exact ⟨a, subtype.eq ha⟩ },
+    have : ∃ r s : R, b.hom y = r • finsupp.single 0 1 + s • finsupp.single 1 1,
+    { refine ⟨(b.hom y).to_fun 0, (b.hom y).to_fun 1, _⟩, ext i, fin_cases i; simp; refl },
+    obtain ⟨r, s, h⟩ := this, replace h := congr_arg b.inv h,
+    rw [← comp_apply, b.hom_inv_id, Module.id_apply, map_add, map_smul, map_smul] at h,
+    rw h at hy,
+    dsimp [b] at hy,
+    rw [zeroth_homology_of_boundary_of_one_simplex_spec, zeroth_homology_of_boundary_of_one_simplex_spec] at hy,
+    rw [linear_map.mem_ker, map_add, map_smul, map_smul] at hy,
+    have H : r • (singular_homology R 0).map (topological_simplex_boundary_incl_topological_simplex 1)
+                 (singular_homology0_basis R (Top.of (topological_simplex_boundary 1))
+                   (quot.mk (path_setoid (topological_simplex_boundary 1)).r x0))
+           + s • (singular_homology R 0).map (topological_simplex_boundary_incl_topological_simplex 1)
+                   (singular_homology0_basis R (Top.of (topological_simplex_boundary 1))
+                     (quot.mk (path_setoid (topological_simplex_boundary 1)).r x1)) 
+           = 0,
+    { refine eq.mp _ hy, congr },
+    have H' := H,
+    rw [singular_homology0_map_matrix, singular_homology0_map_matrix] at H',
+    have H'' : quot.mk (path_setoid (topological_simplex 1)).r
+                 (topological_simplex_boundary_incl_topological_simplex 1 x0)
+             = quot.mk (path_setoid (topological_simplex 1)).r
+                 (topological_simplex_boundary_incl_topological_simplex 1 x1),
+    { apply quot.sound,
+      apply_with path_connected_space.joined {instances:=ff},
+      apply_with contractible_space.path_connected_space {instances:=ff},
+      exact (convex_std_simplex ℝ (fin 2)).contractible_space ⟨(vertex 1 0).val, (vertex 1 0).property⟩ },
+    rw [H'', ← add_smul, ← basis.repr_symm_single] at H',
+    rw [linear_equiv.symm_apply_eq, map_zero] at H',
+    rw [finsupp.single_eq_zero, ← eq_neg_iff_add_eq_zero] at H',
+    existsi r,
+    rw [h, H'],
+    dsimp [v1, v2], rw [neg_smul, neg_smul, smul_sub, neg_sub, sub_eq_neg_add] }
+end.
+
+lemma simplex_rel_boundary_connecting_homomorphism_is_iso (R : Type*) [comm_ring R]
+  (n k : ℕ) (hk : k > 0)
+  : is_iso (singular_homology_connecting_homomorphism R k (topological_simplex_boundary_incl_topological_simplex n) (set.inclusion_injective _)) :=
+begin
+  let i := (singular_chain_complex R).map (topological_simplex_boundary_incl_topological_simplex n),
+  -- this comes up a lot, should probably be a lemma
+  haveI : mono i := boundary_inclusion_mono_on_chains n,
+  let δ := homological_complex.δ i ((coker_functor_proj (chain_complex (Module R) ℕ)).app (arrow.mk i))
+                                   (coker_functor_degreewise_SES i) (k+1) k rfl,
+  have LES : exact_seq (Module R) [arrow.mk ((homology_functor (Module R) (complex_shape.down ℕ) (k+1)).map ((coker_functor_proj (chain_complex (Module R) ℕ)).app (arrow.mk i))),
+                                   arrow.mk δ, 
+                                   arrow.mk ((homology_functor (Module R) (complex_shape.down ℕ) k).map i)] :=
+              (homological_complex.six_term_exact_seq i
+                 ((coker_functor_proj (chain_complex (Module R) ℕ)).app (arrow.mk i))
+                 (coker_functor_degreewise_SES i) (k+1) k rfl).extract 1 3,
+  
+  refine is_iso_of_exact_of_is_zero_of_is_zero _ _ _ _ _ LES;
+  refine limits.is_zero_of_iso_of_zero (limits.is_zero_zero _) _;
+  symmetry;
+  refine nonempty.some _,
+  { apply homology_of_contractible_space R _ _ (k+1) (nat.zero_lt_succ k),
+    exact (convex_std_simplex ℝ (fin (n+1))).contractible_space ⟨(vertex n 0).val, (vertex n 0).property⟩ },
+  { apply homology_of_contractible_space R _ _ k hk,
+    exact (convex_std_simplex ℝ (fin (n+1))).contractible_space ⟨(vertex n 0).val, (vertex n 0).property⟩ }
+end
+
+lemma homology_of_boundary_iso_drop_degree (R : Type*) [comm_ring R] [nontrivial R]
+  (n k : ℕ) (hk : k > 0)
+  : is_iso ((homology_rel_boundary_iso_homology_of_boundary n (k+1) (nat.zero_lt_succ k)).hom
+           ≫ singular_homology_connecting_homomorphism R k (topological_simplex_boundary_incl_topological_simplex n)
+                                                           (set.inclusion_injective _)) :=
+begin
+  apply_with is_iso.comp_is_iso {instances:=ff},
+  { apply_instance },
+  { apply simplex_rel_boundary_connecting_homomorphism_is_iso, assumption }
+end
+
+lemma dom_is_zero_of_exact_of_is_zero_of_mono {V : Type*} [category V] [abelian V]
+  {A B C D : V} {f : A ⟶ B} {g : B ⟶ C} {h : C ⟶ D}
+  (e : exact_seq V [f, g, h]) (h1 : limits.is_zero A) (h2 : mono h)
+  : limits.is_zero B :=
+begin
+  haveI : mono g := exact.mono_of_eq_zero ((exact_iff_exact_seq _ _).mpr (e.extract 0 2))
+                                          (limits.is_zero.eq_zero_of_src h1 _),
+  rw [limits.is_zero_iff_id_eq_zero, ← cancel_mono g, category.id_comp, limits.zero_comp],
+  exact exact.eq_zero_of_mono ((exact_iff_exact_seq _ _).mpr (e.extract 1 2)) h2
+end
+
+lemma homology_of_boundary_is_zero (R : Type*) [comm_ring R] [nontrivial R]
+  (n k : ℕ) (hk1 : k > 0) (hk2 : k + 1 ≠ n)
+  : limits.is_zero ((singular_homology R k).obj (Top.of (topological_simplex_boundary n))) :=
+begin
+  cases n with n, { apply homology_of_boundary_of_zero_simplex },
+  revert k hk1 hk2, induction n with n ih; intros,
+  { apply higher_homology_of_boundary_of_one_simplex, exact hk1 },
+  { cases k, { exfalso, exact lt_irrefl _ hk1 },
+    rw nat.add_one at hk2, simp at hk2,
+    refine limits.is_zero_of_iso_of_zero _ (homology_rel_boundary_iso_homology_of_boundary n.succ k.succ hk1).symm,
+    
+    let i := (singular_chain_complex R).map (topological_simplex_boundary_incl_topological_simplex n.succ),
+    -- this comes up a lot, should probably be a lemma
+    haveI : mono i := boundary_inclusion_mono_on_chains n.succ,
+    let δ := homological_complex.δ i ((coker_functor_proj (chain_complex (Module R) ℕ)).app (arrow.mk i))
+                                    (coker_functor_degreewise_SES i) k.succ k rfl,
+    have LES : exact_seq (Module R) [arrow.mk ((homology_functor (Module R) (complex_shape.down ℕ) k.succ).map ((coker_functor_proj (chain_complex (Module R) ℕ)).app (arrow.mk i))),
+                                    arrow.mk δ, 
+                                    arrow.mk ((homology_functor (Module R) (complex_shape.down ℕ) k).map i)] :=
+                (homological_complex.six_term_exact_seq i
+                  ((coker_functor_proj (chain_complex (Module R) ℕ)).app (arrow.mk i))
+                  (coker_functor_degreewise_SES i) k.succ k rfl).extract 1 3,
+    have H : k > 0 ∨ (k = 0 ∧ n > 0),
+    { rw or_iff_not_imp_left,
+      intro h,
+      have h' : k = 0,
+      { cases k with j, { refl }, { exfalso, exact h (nat.zero_lt_succ j) } },
+      refine ⟨h', _⟩,
+      rw h' at hk2, destruct n,
+      { intro h', exfalso, exact hk2 h'.symm },
+      { intros j h', rw h', exact nat.zero_lt_succ j } },
+    cases H,
+    { apply dom_is_zero_of_exact_of_is_zero_of_mono LES,
+      { refine limits.is_zero_of_iso_of_zero (limits.is_zero_zero _) _,
+        symmetry, refine nonempty.some _,
+        apply homology_of_contractible_space R _ _ k.succ (nat.zero_lt_succ k),
+        exact (convex_std_simplex ℝ (fin (n+2))).contractible_space ⟨(vertex (n+1) 0).val, (vertex (n+1) 0).property⟩ },
+      { apply limits.is_initial.mono_from, apply limits.is_zero.is_initial,
+        exact ih k H (nat.succ_ne_succ.mpr hk2) } },
+    { cases H with H' H, subst H',
+      apply dom_is_zero_of_exact_of_is_zero_of_mono LES,
+      { refine limits.is_zero_of_iso_of_zero (limits.is_zero_zero _) _,
+        symmetry, refine nonempty.some _,
+        apply homology_of_contractible_space R _ _ 1 nat.zero_lt_one,
+        exact (convex_std_simplex ℝ (fin (n+2))).contractible_space ⟨(vertex (n+1) 0).val, (vertex (n+1) 0).property⟩ },
+      { rw [Module.mono_iff_ker_eq_bot, linear_map.ker_eq_bot'],
+        intros m hm,
+        let b := singular_homology0_basis R (Top.of (topological_simplex_boundary n.succ)),
+        let x0 : topological_simplex_boundary (n+1) := ⟨(vertex (n+1) 0).val, vertex_mem_boundary (n+1) (nat.zero_lt_succ n) 0⟩,
+        let b0 := b (quot.mk (path_setoid (topological_simplex_boundary (n+1))).r x0),
+        let r := @basis.coord (zeroth_homotopy (topological_simplex_boundary (n+1))) R
+                              ((singular_homology R 0).obj (Top.of (topological_simplex_boundary n.succ)))
+                              _ _ _ b
+                              (quot.mk (path_setoid (topological_simplex_boundary (n+1))).r x0) m, 
+        have : m = r • b0,
+        { apply @basis.ext_elem (zeroth_homotopy (topological_simplex_boundary (n+1))) R
+                                ((singular_homology R 0).obj (Top.of (topological_simplex_boundary n.succ)))
+                                _ _ _ b,
+          intro i,
+          have : i = (quot.mk (path_setoid (topological_simplex_boundary (n+1))).r x0),
+          { induction i,
+            { apply quot.sound,
+              apply_with path_connected_space.joined {instances:=ff},
+              apply boundary_of_simplex_path_connected,
+              simp only [lt_add_iff_pos_left, gt_iff_lt],
+              exact H },
+            { refl } },
+          rw this, simp [r, b0] },
+        rw this at hm ⊢,
+        rw map_smul at hm, 
+        suffices : r = 0, { rw this, exact zero_smul _ _ },
+        have H' : r • (singular_homology R 0).map (topological_simplex_boundary_incl_topological_simplex n.succ)
+                        (singular_homology0_basis R (Top.of (topological_simplex_boundary n.succ))
+                          (quot.mk (path_setoid (topological_simplex_boundary n.succ)).r x0))
+                = 0,
+        { refine eq.mp _ hm, congr },
+        rw [singular_homology0_map_matrix, ← basis.repr_symm_single,
+            linear_equiv.symm_apply_eq, map_zero, finsupp.single_eq_zero] at H',
+        exact H' } } }
+end.
+
+noncomputable
+def nth_homology_of_boundary_of_n_plus_one_simplex {R : Type*} [comm_ring R] [nontrivial R]
+  (n : ℕ) (hn : n > 0)
+  : (singular_homology R n).obj (Top.of (topological_simplex_boundary (n + 1)))
+  ≅ Module.of R R :=
+begin
+  cases n, { exfalso, exact lt_irrefl 0 hn }, clear hn,
+  induction n with n ih,
+  { exact first_homology_of_boundary_of_two_simplex },
+  { exact @as_iso _ _ _ _ _ (homology_of_boundary_iso_drop_degree R (n+2) (n+1) (nat.zero_lt_succ n))
+          ≪≫ ih }
 end.
 
