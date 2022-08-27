@@ -1452,17 +1452,25 @@ end.
 noncomputable
 def zeroth_homology_of_boundary_of_n_simplex {R : Type*} [comm_ring R] [nontrivial R] (n : ℕ)
   (hn : n > 1) : (singular_homology R 0).obj (Top.of (topological_simplex_boundary n))
-  ≅ (Module.free R).obj (fin 1) :=
+  ≅ Module.of R R :=
 begin
-  refine linear_equiv.to_Module_iso'_left _,
-  apply_with (linear_equiv.trans (singular_homology0_basis R _).repr
-                                 (finsupp.dom_lcongr _)) {instances:=ff},
-  symmetry,
-  refine fin_one_equiv.trans (equiv.symm _),
-  apply_with equiv.equiv_punit {instances:=ff},
-  refine nonempty.some _,
-  rw [unique_iff_subsingleton_and_nonempty, and.comm, ← path_connected_space_iff_zeroth_homotopy],
-  exact boundary_of_simplex_path_connected n hn
+  transitivity (Module.free R).obj (fin 1),
+  { refine linear_equiv.to_Module_iso'_left _,
+    apply_with (linear_equiv.trans (singular_homology0_basis R _).repr
+                                  (finsupp.dom_lcongr _)) {instances:=ff},
+    symmetry,
+    refine fin_one_equiv.trans (equiv.symm _),
+    apply_with equiv.equiv_punit {instances:=ff},
+    refine nonempty.some _,
+    rw [unique_iff_subsingleton_and_nonempty, and.comm, ← path_connected_space_iff_zeroth_homotopy],
+    exact boundary_of_simplex_path_connected n hn },
+  { refine linear_equiv.to_Module_iso _,
+    -- extract this
+    refine ⟨(λ f, f 0), _, _, (λ r, finsupp.single 0 r), _, _⟩,
+    { intros, refl },
+    { intros, refl },
+    { intro, ext, simp },
+    { intro, simp } }
 end.
 
 noncomputable
