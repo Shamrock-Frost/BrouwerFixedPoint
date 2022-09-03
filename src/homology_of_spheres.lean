@@ -132,15 +132,6 @@ def topological_simplex_relative_homology_generator (R : Type*) [comm_ring R] (n
                                     simp [simplex_category.δ, simplex_category.hom.mk] at hj,
                                     exact fin.succ_above_ne _ _ hj } }).
 
-noncomputable
-def embedding_restricts_to_homeomorph {X Y : Type*} [topological_space X] [topological_space Y]
-  (s : set X) (f : X → Y) (hf : embedding f) : s ≃ₜ f '' s := 
-begin
-  convert (homeomorph.of_embedding _ (embedding.comp hf (@embedding_subtype_coe _ _ s))),
-  { rw [set.range_comp, subtype.range_coe] },
-  { ext, rw [set.range_comp, subtype.range_coe] }
-end
-
 def topological_simplex_boundary_minus_interior_of_bottom_face (n : ℕ)
   := topological_simplex_boundary n ∩ { p | ∃ i, i ≠ 0 ∧ p i = 0 }
 

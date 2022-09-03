@@ -120,3 +120,22 @@ lemma embedding.pullback_spec {α β γ : Type*} [topological_space α] [topolog
 begin
   intro x, exact classical.some_spec (hg (set.mem_range_self x))
 end
+
+noncomputable
+def embedding_restricts_to_homeomorph {X Y : Type*} [topological_space X] [topological_space Y]
+  (s : set X) (f : X → Y) (hf : embedding f) : s ≃ₜ f '' s := 
+begin
+  refine homeomorph.trans (homeomorph.of_embedding _ (embedding.comp hf (@embedding_subtype_coe _ _ s)))
+         ⟨equiv.set_congr _, _, _⟩,
+  { rw [set.range_comp, subtype.range_coe] },
+  { exact continuous_subtype_mk _ continuous_subtype_coe },
+  { exact continuous_subtype_mk _ continuous_subtype_coe }
+end
+
+-- lemma embedding_restricts_to_homeomorph_spec
+--   {X Y : Type*} [topological_space X] [topological_space Y]
+--   (s : set X) (f : X → Y) (hf : embedding f) (x : s)
+--   : embedding_restricts_to_homeomorph s f hf x = ⟨f x.val, set.mem_image_of_mem f x.property⟩ :=
+-- begin
+--   refl
+-- end
