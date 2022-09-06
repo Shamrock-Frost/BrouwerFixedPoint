@@ -1,7 +1,11 @@
 import analysis.convex.gauge analysis.normed_space.basic
 import topology.category.CompHaus.default
-import general_topology
+import .general_topology
 import analysis.inner_product_space.euclidean_dist
+import data.set.function
+import .linear_algebra
+import analysis.normed_space.hahn_banach.extension
+import analysis.normed_space.add_torsor_bases
 
 lemma convex_with_zero_in_int_is_absorbing {E : Type*} [seminormed_add_comm_group E]
   [normed_space ℝ E] (s : set E) (hs₁ : convex ℝ s) (hs₂ : (0 : E) ∈ interior s)
@@ -64,26 +68,15 @@ begin
 end.
 
 noncomputable
-def normalize_by_gauge {E : Type*} [seminormed_add_comm_group E] [normed_space ℝ E] (s : set E)
-  := λ x, (gauge s x * ∥x∥⁻¹) • x
+def normalize_by (K E : Type*) [is_R_or_C K] [normed_add_comm_group E] [normed_space K E]
+  (f : E → K) := λ x, (f x * (∥x∥⁻¹ : K)) • x
 
-lemma norm_of_normalize_by_gauge {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
-  (s : set E) (x : E) : ∥normalize_by_gauge s x∥ = gauge s x :=
+lemma normalize_by_continuous (K E : Type*) [is_R_or_C K] [normed_add_comm_group E]
+  [normed_space K E] (f : E → K) (hf1 : continuous f) (hf2 : f 0 = 0)
+  : continuous (normalize_by K E f) :=
 begin
-  dsimp [normalize_by_gauge],
-  by_cases x = 0,
-  { subst h, simp },
-  { rw [norm_smul, norm_mul, mul_assoc, norm_inv, norm_norm, inv_mul_cancel],
-    { rw [real.norm_eq_abs, abs_eq_self.mpr (gauge_nonneg _)], exact mul_one _ },
-    { simp, exact h } }
-end
-
-lemma normalize_by_gauge_cont {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
-  (s : set E) (hs₁ : convex ℝ s) (hs₂ : (0 : E) ∈ interior s)
-  : continuous (normalize_by_gauge s) :=
-begin
-  suffices : continuous_on (normalize_by_gauge s) (set.univ \ {0}) 
-           ∧ continuous_at (normalize_by_gauge s) 0,
+  suffices : continuous_on (normalize_by K E f) (set.univ \ {0}) 
+           ∧ continuous_at (normalize_by K E f) 0,
   { obtain ⟨h1, h2⟩ := this,
     constructor,
     intros U hU,
@@ -95,7 +88,7 @@ begin
         specialize h2 U,
         rw mem_nhds_iff at h2,
         specialize h2 ⟨U, subset_refl U, hU, _⟩,
-        { simp [normalize_by_gauge], exact h },
+        { simp [normalize_by], exact h },
         rw mem_nhds_iff at h2,
         obtain ⟨t, ht1, ht2, ht3⟩ := h2,
         convert is_open.union h1 ht2,
@@ -106,26 +99,52 @@ begin
         apply set.union_subset_union_right, rw set.singleton_subset_iff, exact ht3 },
       { convert h1,
         ext, simp, intros h2 h3, rw h3 at h2,
-        simp [normalize_by_gauge] at h2,
+        simp [normalize_by] at h2,
         exact h h2 } },
     { apply is_open_compl_singleton } },
   split,
   { refine continuous_on.smul _ continuous_on_id,
-    refine continuous_on.mul (gauge_cont s hs₁ hs₂).continuous.continuous_on _,
+    refine continuous_on.mul hf1.continuous_on _,
     apply continuous_on.inv₀,
-    { exact continuous_on.norm continuous_on_id },
+    { exact continuous.continuous_on (is_R_or_C.continuous_of_real.comp continuous_norm) },
     { simp } },
   { rw metric.continuous_at_iff,
     intros ε hε, 
-    have := gauge_cont s hs₁ hs₂, rw metric.uniform_continuous_iff at this,
-    obtain ⟨δ, hδ, H⟩ := this ε hε,
-    specialize @H 0, simp at H, 
+    rw metric.continuous_iff at hf1,
+    obtain ⟨δ, hδ, H⟩ := hf1 0 ε hε,
+    simp at H, 
     refine ⟨δ, hδ, _⟩,
-    simp [normalize_by_gauge],
+    simp [normalize_by],
     intros x hx,
-    convert H hx,
-    convert norm_of_normalize_by_gauge s x,
-    exact abs_eq_self.mpr (gauge_nonneg _) }
+    convert H x hx,
+    rw hf2, simp,
+    by_cases x = 0,
+    { rw [h, hf2], simp, },
+    { rw [mul_smul, norm_smul], simp [norm_smul_inv_norm h] } }
+end
+
+noncomputable
+def normalize_by_gauge {E : Type*} [normed_add_comm_group E] [normed_space ℝ E] (s : set E)
+  := normalize_by ℝ E (gauge s)
+
+lemma norm_of_normalize_by_gauge {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
+  (s : set E) (x : E) : ∥normalize_by_gauge s x∥ = gauge s x :=
+begin
+  dsimp [normalize_by_gauge, normalize_by],
+  by_cases x = 0,
+  { subst h, simp },
+  { rw [norm_smul, norm_mul, mul_assoc, norm_inv, norm_norm, inv_mul_cancel],
+    { rw [real.norm_eq_abs, abs_eq_self.mpr (gauge_nonneg _)], exact mul_one _ },
+    { simp, exact h } }
+end
+
+lemma normalize_by_gauge_cont {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
+  (s : set E) (hs₁ : convex ℝ s) (hs₂ : (0 : E) ∈ interior s)
+  : continuous (normalize_by_gauge s) :=
+begin
+  apply normalize_by_continuous,
+  { exact (gauge_cont s hs₁ hs₂).continuous },
+  { exact gauge_zero }
 end.
 
 lemma interior_eq_gauge_lt_one {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
@@ -279,7 +298,7 @@ begin
   { simp, rintros ⟨y, hy⟩,
     by_cases y = 0,
     { refine ⟨⟨0, interior_subset hs₂⟩, _⟩,
-      simp [normalize_by_gauge, set.restrict, set.cod_restrict], exact h.symm },
+      simp [normalize_by, normalize_by_gauge, set.restrict, set.cod_restrict], exact h.symm },
     { have h' := h,
       rw ← gauge_eq_zero_iff s h2 h3 at h',
       refine ⟨⟨∥y∥ • (gauge s y)⁻¹ • y, _⟩, _⟩,
@@ -293,7 +312,7 @@ begin
         swap, apply_instance,
         rw [smul_eq_mul, mul_right_comm, mul_inv_cancel_right₀ h'], 
         exact mem_closed_ball_zero_iff.mp hy },
-      { simp [normalize_by_gauge, set.restrict, set.cod_restrict],
+      { simp [normalize_by, normalize_by_gauge, set.restrict, set.cod_restrict],
         rw gauge_smul_of_nonneg (norm_nonneg _); try { apply_instance },
         rw gauge_smul_of_nonneg (inv_nonneg.mpr (gauge_nonneg _)); try { apply_instance },
         rw [smul_smul, smul_smul],
@@ -363,19 +382,198 @@ begin
       { simp, exact H } } }
 end.
 
--- Maybe this would be better if we had matroids?
-noncomputable 
-def succ_affine_dim {E : Type*} [normed_add_comm_group E] [normed_space ℝ E] (s : set E)
-  := ⨆ (ι : {t : set E // t ⊆ s ∧ affine_independent ℝ (coe : t → E)}), cardinal.mk ι.val
+noncomputable
+def affine_dim (k : Type*) [division_ring k]
+  {E : Type*} [add_comm_group E] [module k E] (s : set E) :=
+  module.rank k ((affine_span k s).direction)
+
+-- noncomputable 
+-- def succ_affine_dim {E : Type*} [add_comm_group E] [module ℝ E] (s : set E)
+--   := ⨆ (ι : {t : set E // t ⊆ s ∧ affine_independent ℝ (coe : t → E)}), cardinal.mk ι.val
 
 /-
 we will prove that if C is a compact convex set in E with succ_affine_dim C = n + 1 < ∞ 
 then C is homeomorphic to the unit ball in ℝ^n
 -/
-lemma convex_compact_homeo_to_ball {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
-  (s : set E) (hs₁ : convex ℝ s) (hs₂ : is_compact s)
-  (n : ℕ) (hs₃ : succ_affine_dim s = n + 1)
-  : nonempty (s ≃ₜ metric.closed_ball (0 : euclidean_space ℝ (fin n)) 1) :=
+lemma closed_ball_homeo_of_finite_dim (K : Type*) {V W : Type*} [is_R_or_C K]
+  [normed_add_comm_group V] [normed_space K V] [finite_dimensional K V]
+  [normed_add_comm_group W] [normed_space K W] [finite_dimensional K W] 
+  (H : finite_dimensional.finrank K V = finite_dimensional.finrank K W)
+  : nonempty (metric.closed_ball (0 : V) 1 ≃ₜ metric.closed_ball (0 : W) 1) :=
 begin
-  
+  obtain ⟨F⟩ := finite_dimensional.nonempty_continuous_linear_equiv_of_finrank_eq H,
+  let G₁ : metric.closed_ball (0 : V) 1 → metric.closed_ball (0 : W) 1 := λ v, ⟨(∥v.val∥ * ∥F v.val∥⁻¹ : K) • F v.val, _⟩,
+  swap,
+  { rw [mem_closed_ball_zero_iff, norm_smul, norm_mul, norm_inv,
+        is_R_or_C.norm_coe_norm, is_R_or_C.norm_coe_norm, mul_assoc],
+    by_cases v.val = 0,
+    { rw h, rw [norm_zero, zero_mul], exact zero_le_one },
+    { rw [inv_mul_cancel, mul_one], exact mem_closed_ball_zero_iff.mp v.property,
+      rw norm_ne_zero_iff, exact (linear_equiv.map_ne_zero_iff F.to_linear_equiv).mpr h } },
+  let G₂ : metric.closed_ball (0 : W) 1 → metric.closed_ball (0 : V) 1 := λ v, ⟨(∥v.val∥ * ∥F.symm v.val∥⁻¹ : K) • F.symm v.val, _⟩,
+  swap,
+  { rw [mem_closed_ball_zero_iff, norm_smul, norm_mul, norm_inv,
+        is_R_or_C.norm_coe_norm, is_R_or_C.norm_coe_norm, mul_assoc],
+    by_cases v.val = 0,
+    { rw h, rw [norm_zero, zero_mul], exact zero_le_one },
+    { rw [inv_mul_cancel, mul_one], exact mem_closed_ball_zero_iff.mp v.property,
+      rw norm_ne_zero_iff, exact (linear_equiv.map_ne_zero_iff F.symm.to_linear_equiv).mpr h } },
+  refine ⟨⟨⟨G₁, G₂, _, _⟩, continuous_subtype_mk _ _, continuous_subtype_mk _ _⟩⟩,
+  any_goals
+  { rintro ⟨x, hx⟩, simp [G₁, G₂], by_cases x = 0, { rw h, simp },
+    rw norm_smul_inv_norm' (norm_nonneg _),
+    swap, exact (linear_equiv.map_ne_zero_iff (continuous_linear_equiv.to_linear_equiv _)).mpr h,
+    rw [norm_smul, norm_mul, norm_inv, is_R_or_C.norm_coe_norm, is_R_or_C.norm_coe_norm,
+        ← is_R_or_C.of_real_inv, mul_inv, mul_inv, inv_inv, ← mul_smul], 
+    convert one_smul _ _,
+    simp, field_simp, rw mul_right_comm,
+    apply div_self,
+    refine mul_ne_zero (mul_self_ne_zero.mpr _) _; norm_cast; rw norm_eq_zero,
+    exact h, exact (linear_equiv.map_ne_zero_iff (continuous_linear_equiv.to_linear_equiv _)).mpr h },
+  { refine continuous.comp (_ : continuous (λ v : V,  ((∥v∥ : K) * ((∥F v∥)⁻¹ : K)) • F v))
+                           continuous_subtype_val,
+    convert continuous.comp (_ : continuous (λ w : W,  ((∥F.symm w∥ : K) * ((∥w∥)⁻¹ : K)) • w))
+                            F.continuous_to_fun,
+    { ext, simp },
+    { apply normalize_by_continuous,
+      { continuity },
+      { simp } } },
+  { refine continuous.comp (_ : continuous (λ w : W,  ((∥w∥ : K) * ((∥F.symm w∥)⁻¹ : K)) • F.symm w))
+                           continuous_subtype_val,
+    convert continuous.comp (_ : continuous (λ v : V,  ((∥F v∥ : K) * ((∥v∥)⁻¹ : K)) • v))
+                            F.symm.continuous_to_fun,
+    { ext, simp, congr, symmetry, exact F.to_linear_equiv.right_inv x },
+    { apply normalize_by_continuous,
+      { continuity },
+      { simp } } }
+end.
+
+/-
+Cool results that I did not end up needing
+-/
+lemma hahn_banach_finite_dim {K : Type*} [is_R_or_C K] {V E : Type*} [seminormed_add_comm_group E]
+  [normed_space K E] [normed_add_comm_group V] [normed_space K V] [finite_dimensional K V] 
+  (p : subspace K E) (f : ↥p →L[K] V) : ∃ (g : E →L[K] V), ∀ (x : ↥p), g x = f x :=
+begin
+  let d := finite_dimensional.finrank K V,
+  let b : basis (fin d) K V := finite_dimensional.fin_basis K V,
+  let T := b.equiv_fun.to_continuous_linear_equiv,
+  suffices : ∃ (g : E →L[K] (fin d → K)), ∀ (x : ↥p), g x = (T.to_continuous_linear_map.comp f) x,
+  { obtain ⟨g, H⟩ := this,
+    refine ⟨continuous_linear_map.comp T.symm.to_continuous_linear_map g, _⟩,
+    intro x, convert congr_arg T.symm.to_continuous_linear_map (H x),
+    symmetry, exact continuous_linear_equiv.symm_apply_apply T (f x) },
+  let fi : fin d → ↥p →L[K] K := λ i, continuous_linear_map.comp ((pi.basis_fun K (fin d)).coord i).to_continuous_linear_map
+                                                                 (T.to_continuous_linear_map.comp f),
+  let gi : fin d → (E →L[K] K) := λ i, classical.some (exists_extension_norm_eq p (fi i)),
+  have gi_spec : ∀ (i : fin d), (∀ (x : p), gi i x = fi i x) ∧ (∥gi i∥ = ∥fi i∥)
+    := λ i, classical.some_spec (exists_extension_norm_eq p (fi i)),
+  replace gi_spec := λ i, and.left (gi_spec i),
+  refine ⟨continuous_linear_map.pi gi, _⟩,
+  intro x, ext i,
+  rw continuous_linear_map.coe_pi',
+  dsimp,
+  rw gi_spec,
+  dsimp [fi],
+  rw pi.basis_fun_repr
+end.
+
+lemma injective_continuous_linear_map_is_embedding (K : Type*) {V E : Type*} [is_R_or_C K]
+  [normed_add_comm_group V] [normed_space K V] [finite_dimensional K V]
+  [normed_add_comm_group E] [normed_space K E] 
+  (T : V →ₗ[K] E) (hT : function.injective T) : embedding T :=
+begin
+  suffices : ∃ S : E →L[K] V, function.left_inverse S T,
+  { obtain ⟨S, hS⟩ := this,
+    exact function.left_inverse.embedding hS (map_continuous S) (map_continuous T) },
+  let p := T.range,
+  let G : V ≃ₗ[K] p := linear_equiv.of_injective T hT,
+  obtain ⟨g, hg⟩ := hahn_banach_finite_dim p G.symm.to_linear_map.to_continuous_linear_map,
+  refine ⟨g, _⟩,
+  intro, convert hg (G x), symmetry, exact linear_equiv.symm_apply_apply G x
 end
+
+lemma convex_spanning_set_has_nonempty_interior {V : Type*}
+  [normed_add_comm_group V] [normed_space ℝ V] [finite_dimensional ℝ V]
+  (s : set V) (hs₁ : convex ℝ s) (hs₂ : (0 : V) ∈ s) (hs₃ : submodule.span ℝ s = ⊤)
+  : (interior s).nonempty :=
+begin
+  rw hs₁.interior_nonempty_iff_affine_span_eq_top,
+  rw eq_top_iff at ⊢ hs₃, rw affine_subspace.le_def, rw ← set_like.coe_subset_coe at hs₃,
+  refine subset_trans hs₃ _,
+  simp [span_points], intros x hx,
+  refine ⟨0, hs₂, x, _, (add_zero x).symm⟩,
+  refine submodule.span_mono _ hx,
+  intros y hy, refine ⟨y, 0, hy, hs₂, sub_zero y⟩
+end
+
+lemma convex_compact_homeo_to_ball {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
+  (s : set E) (hs₁ : convex ℝ s) (hs₂ : is_compact s) (hs₃ : s.nonempty)
+  (n : ℕ) (hs₄ : affine_dim ℝ s = n)
+  : nonempty (s ≃ₜ metric.closed_ball (0 : euclidean_space ℝ (fin n)) 1) :=
+begin 
+  obtain ⟨x0, hx0⟩ := hs₃,
+  haveI : finite_dimensional ℝ (affine_span ℝ s).direction,
+  { cases n,
+    { exact finite_dimensional_of_dim_eq_zero hs₄ },
+    { apply finite_dimensional.finite_dimensional_of_finrank_eq_succ, swap, exact n, 
+      refine eq.trans _ (cardinal.to_nat_cast (n + 1)), exact congr_arg cardinal.to_nat hs₄ } },
+  suffices : nonempty (s ≃ₜ metric.closed_ball (0 : (affine_span ℝ s).direction) 1),
+  { obtain ⟨F⟩ := this, refine ⟨F.trans _⟩,
+    refine nonempty.some (closed_ball_homeo_of_finite_dim ℝ _),
+    rw finrank_euclidean_space_fin,
+    dsimp [finite_dimensional.finrank], dsimp [affine_dim] at hs₄,
+    rw hs₄, exact cardinal.to_nat_cast n },
+  let F : (affine_span ℝ s).direction → E := λ q, x0 +ᵥ q,
+  have hF1 : s ⊆ set.range F,
+  { refine subset_trans (subset_span_points ℝ s) (subset_of_eq _),
+    ext, split,
+    { rintros ⟨a, ha, v, hv, H⟩, rw H,
+      rw ← direction_affine_span at hv,
+      refine ⟨⟨v + (a -ᵥ x0), submodule.add_mem _ hv _⟩, _⟩,
+      { rw direction_affine_span,
+        apply vsub_mem_vector_span_of_mem_span_points_of_mem_span_points;
+        apply mem_span_points; assumption },
+      { simp [F], rw [subtype.coe_mk, add_left_comm, ← add_sub_assoc, add_sub_cancel'] } },
+    { rintro ⟨a, ha⟩, rw ← ha, simp [F],
+      rw [add_comm], apply vadd_mem_span_points_of_mem_span_points_of_mem_vector_span,
+      { apply mem_span_points, assumption },
+      { rw ← direction_affine_span, exact a.property } } },
+  have hF2 : embedding F := (homeomorph.vadd x0).embedding.comp embedding_subtype_coe,
+  have hF3 : s = F '' (F ⁻¹' s),
+  { symmetry, rw set.image_preimage_eq_iff, exact hF1 },
+  let F' : F ⁻¹' s ≃ₜ s, { convert embedding_restricts_to_homeomorph (F⁻¹' s) F hF2 },
+  suffices : nonempty (F ⁻¹' s ≃ₜ metric.closed_ball (0 : (affine_span ℝ s).direction) 1),
+  { obtain ⟨G⟩ := this, refine ⟨F'.symm.trans G⟩ },
+  have hF' : convex ℝ (F ⁻¹' s),
+  { intros a b ha hb u v hu hv huv, simp [F],
+    have h : (x0 : E) = u • (x0 : E) + v • (x0 : E),
+    { rw [← add_smul, huv, one_smul] },
+    rw [h, ← add_assoc, add_right_comm (u • x0), add_assoc, ← smul_add, ← smul_add],
+    exact hs₁ ha hb hu hv huv },
+  refine nonempty_of_exists (compact_convex_with_nonempty_interior_homeo_to_ball _ hF' _ _),
+  { apply convex_spanning_set_has_nonempty_interior _ hF',
+    { simp [F], assumption },
+    { rw eq_top_iff, rintros ⟨x, hx⟩ _,
+      suffices : ∀ (y : E) (hy : y ∈ vector_span ℝ s),
+               (⟨y, (direction_affine_span ℝ s).substr hy⟩ : (affine_span ℝ s).direction)
+               ∈ submodule.span ℝ (F ⁻¹' s),
+      { exact this x ((direction_affine_span ℝ s).subst hx) },
+      intros y hy, refine submodule.span_induction' _ _ _ _ hy,
+      { rintros z ⟨a, b, ha, hb, h⟩, 
+        have h1 : a -ᵥ x0 ∈ (affine_span ℝ s).direction,
+        { rw direction_affine_span, apply vsub_mem_vector_span; assumption },
+        have h2 : b -ᵥ x0 ∈ (affine_span ℝ s).direction,
+        { rw direction_affine_span, apply vsub_mem_vector_span; assumption },
+        suffices : (⟨_, h1⟩ : (affine_span ℝ s).direction) - (⟨_, h2⟩ : (affine_span ℝ s).direction)
+                 ∈ submodule.span ℝ (F ⁻¹' s),
+        { convert this, rw ← h, simp },
+        refine submodule.sub_mem _ _ _;
+        refine submodule.subset_span _;
+        simp [F]; assumption },
+      { exact submodule.zero_mem _ },
+      { intros _ _ _ _ h1 h2, exact submodule.add_mem _ h1 h2 },
+      { intros a _ _ h, exact submodule.smul_mem _ a h } } },
+  { rw is_compact_iff_compact_space at ⊢ hs₂, haveI := hs₂, exact F'.symm.compact_space }
+end.
+

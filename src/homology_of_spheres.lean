@@ -1,5 +1,5 @@
 import for_mathlib.homology
-import .barycentric_subdivision .reduced_homology
+import .barycentric_subdivision .reduced_homology .convex
 
 -- Should rework this so everything is a subset of ℝ^(n+1) and we just intersect
 def topological_simplex_boundary (n : ℕ) := topological_simplex n ∩ { p | ∃ i, p i = 0 }
@@ -1715,3 +1715,337 @@ begin
           ≪≫ ih }
 end.
 
+def take_linear_combination (R : Type*) {E : Type*} [semiring R]
+  [add_comm_monoid E] [module R E] {ι : Type*} [fintype ι] (v : ι → E) : (ι → R) → E :=
+  finset.univ.sum (λ (x : ι), (@linear_map.proj R ι _ (λ _, R) _ _ x).smul_right (v x))
+
+lemma take_linear_combination_cont {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
+  {ι : Type*} [fintype ι] (v : ι → E) : continuous (take_linear_combination ℝ v) :=
+begin
+  dsimp [take_linear_combination],
+  convert continuous_finset_sum (finset.univ : finset ι)
+                                (_ : ∀ i : ι, i ∈ finset.univ → continuous (λ (c : ι → ℝ), c i • v i)),
+  { ext, rw fintype.sum_apply },
+  { intros, continuity }
+end
+
+lemma take_linear_combination_image_of_std_simplex (R : Type*) {E : Type*} [linear_ordered_field R]
+  [add_comm_group E] [module R E] {ι : Type*} [fintype ι] (v : ι → E)
+  : take_linear_combination R v '' (std_simplex R ι) = convex_hull R (set.range v) :=
+begin
+  rw set.finite.convex_hull_eq_image (set.finite_range v),
+  let F : (ι → R) → (set.range v → R) := λ f c, (finset.filter (λ (a : ι), v a = c.val) finset.univ).sum (λ (a : ι), f a),
+  suffices : F '' std_simplex R ι = std_simplex R (set.range v),
+  { convert eq.trans _ (congr_arg _ this),
+    rw ← set.image_comp, congr,
+    ext, simp [take_linear_combination, F],
+    transitivity finset.univ.sum (λ (c : set.range v), (finset.filter (λ (a : ι), v a = (c : E)) finset.univ).sum (λ a, x a • (c : E))),
+    { symmetry, convert (finset.sum_fiberwise finset.univ (λ a, (⟨v a, set.mem_range_self a⟩ : set.range v)) (λ a, x a • v a)),
+      ext c, apply finset.sum_congr,
+      { congr, ext, rw subtype.ext_iff, refl },
+      { intros a ha, simp at ha, rw ← ha, refl } },
+    { congr, ext, rw finset.sum_smul } },
+  { apply subset_antisymm,
+    { rw set.image_subset_iff,
+      rintros x hx,
+      refine ⟨_, _⟩,
+      { intros, refine finset.sum_nonneg _, intros, apply hx.left },
+      { convert eq.trans (finset.sum_fiberwise finset.univ (λ a, (⟨v a, set.mem_range_self a⟩ : set.range v)) x) hx.right,
+        dsimp [F], ext, congr, ext, rw subtype.ext_iff, refl } },
+    { intros x hx,
+      by_cases nonempty ι,
+      { haveI := h,
+        let g := function.inv_fun v,
+        refine ⟨(λ a, if a = g (v a) then x ⟨v a, set.mem_range_self a⟩ else 0), ⟨_, _⟩, _⟩,
+        { intros, simp, split_ifs, apply hx.left, refl },
+        { refine eq.trans (finset.sum_filter _ _).symm (eq.trans _ hx.right),
+          refine finset.sum_bij' (λ a _, (⟨v a, set.mem_range_self a⟩ : set.range v)) _ _ (λ c _, g c.val) _ _ _,
+          { intros, exact finset.mem_univ _ },
+          { intros, simp },
+          { rintros ⟨c, hc⟩ _, simp, exact congr_arg g (eq.symm (function.inv_fun_eq hc)) },
+          { intros a ha, simp at ha ⊢, exact ha.symm },
+          { rintros ⟨c, hc⟩ _, exact subtype.eq (function.inv_fun_eq hc) } },
+        { ext c, cases c with c hc, simp [F], refine eq.trans (finset.sum_filter _ _).symm _,
+          rw finset.filter_filter,
+          transitivity (finset.filter (λ (a : ι), a = g c) finset.univ).sum (λ (a : ι), x ⟨v a, set.mem_range_self a⟩),
+          { congr, ext a, split; intro h, { rw [h.right, h.left], refl },
+            { subst h, simp, refine ⟨function.inv_fun_eq hc, congr_arg _ (eq.symm (function.inv_fun_eq hc))⟩ } },
+          { rw finset.filter_eq' finset.univ (g c), simp, congr, exact function.inv_fun_eq hc } } },
+      { exfalso, 
+        obtain ⟨⟨i, hi⟩, _⟩ := finset.exists_ne_zero_of_sum_ne_zero (ne_of_eq_of_ne hx.right zero_ne_one.symm),
+        rw not_nonempty_iff at h, haveI := h, rw set.range_eq_empty at hi, exact hi } } }
+end.
+
+def std_simplex_to_convex_hull (R : Type*) {E : Type*} [linear_ordered_field R]
+  [add_comm_group E] [module R E] {ι : Type*} [fintype ι] (v : ι → E)
+  : std_simplex R ι → convex_hull R (set.range v) :=
+  set.cod_restrict (@set.restrict _ (λ _, E) (std_simplex R ι) (take_linear_combination R v)) _
+                   (by { rw ← take_linear_combination_image_of_std_simplex R v,
+                         rw ← set.range_restrict (take_linear_combination R v) (std_simplex R ι),
+                         exact set.mem_range_self }).
+
+lemma std_simplex_to_convex_hull_cont {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
+  {ι : Type*} [fintype ι] (v : ι → E) : continuous (std_simplex_to_convex_hull ℝ v) :=
+begin
+  dsimp [std_simplex_to_convex_hull], continuity, apply take_linear_combination_cont
+end.
+
+lemma std_simplex_to_convex_hull_surj {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
+  {ι : Type*} [fintype ι] (v : ι → E) : function.surjective (std_simplex_to_convex_hull ℝ v) :=
+begin
+  convert set.surjective_maps_to_image_restrict (take_linear_combination ℝ v) (std_simplex ℝ ι),
+  { symmetry, apply take_linear_combination_image_of_std_simplex },
+  { apply function.hfunext rfl, intros x y hxy, cases hxy, cases x with x hx,
+    simp [std_simplex_to_convex_hull, set.cod_restrict, set.maps_to.restrict, subtype.map], 
+    rw subtype.heq_iff_coe_eq, refl, rw take_linear_combination_image_of_std_simplex, intro, refl }
+end
+
+lemma std_simplex_to_convex_hull_is_quot_map {E : Type*} [normed_add_comm_group E]
+  [normed_space ℝ E] {ι : Type*} [fintype ι] (v : ι → E)
+  : quotient_map (std_simplex_to_convex_hull ℝ v) :=
+  surjection_of_compact_hausdorff_is_quot_map _ (std_simplex_to_convex_hull_surj v)
+                                                (std_simplex_to_convex_hull_cont v)
+
+noncomputable
+def homeomorph_of_injective_quotient_map {α : Type*} {β : Type*}
+  [tα : topological_space α] [tβ : topological_space β] (f : α → β) (hf1 : quotient_map f)
+  (hf2 : function.injective f) : α ≃ₜ β :=
+begin
+  refine equiv.to_homeomorph_of_inducing (equiv.of_bijective f ⟨hf2, hf1.surjective⟩) _,
+  have hf : tβ = topological_space.coinduced (equiv.of_bijective f ⟨hf2, hf1.surjective⟩) tα := hf1.right,
+  rw inducing_iff, 
+  rw ← equiv.coinduced_symm, 
+  refine eq.trans _ (eq.symm (congr_arg _ hf)),
+  rw coinduced_compose,
+  rw equiv.symm_comp_self,
+  exact coinduced_id.symm
+end
+
+lemma std_simplex_to_convex_hull_eq_affine_combination (R : Type*) {E : Type*}
+  [linear_ordered_field R] [add_comm_group E] [module R E] {ι : Type*} [fintype ι] (v : ι → E)
+  (x : std_simplex R ι)
+  : (std_simplex_to_convex_hull R v x : E) = finset.univ.affine_combination v (x : ι → R) :=
+begin
+  simp [std_simplex_to_convex_hull, take_linear_combination, finset.affine_combination],
+  simp_rw [smul_sub], simp,
+  symmetry, convert sub_add_cancel _ _,
+  symmetry, rw ← finset.sum_smul, convert one_smul _ _,
+  exact x.property.right
+end.
+
+lemma affine_basis_coord_take_std_simplex_to_convex_hull {E : Type*}
+  [normed_add_comm_group E] [normed_space ℝ E] {ι : Type*} [fintype ι] (b : affine_basis ι ℝ E)
+  (x : std_simplex ℝ ι) (i : ι)
+  : b.coord i (std_simplex_to_convex_hull ℝ b.points x) = (x : ι → ℝ) i :=
+begin
+  convert affine_basis.coord_apply_combination_of_mem b (finset.mem_univ _) x.property.right,
+  exact std_simplex_to_convex_hull_eq_affine_combination ℝ b.points x
+end
+
+lemma interior_of_convex_hull_of_affine_basis {E : Type*}
+  [normed_add_comm_group E] [normed_space ℝ E] {ι : Type*} [fintype ι] (b : affine_basis ι ℝ E)
+  : take_linear_combination ℝ b.points '' (std_simplex ℝ ι \ { p | ∃ i, p i = 0 })
+  = interior (convex_hull ℝ (set.range b.points)) :=
+begin
+  rw interior_convex_hull_aff_basis,
+  apply subset_antisymm, 
+  { rw set.image_subset_iff,
+    rintros x ⟨h1, h2⟩, simp at h2,
+    simp, 
+    intro i, have := affine_basis_coord_take_std_simplex_to_convex_hull b ⟨x, h1⟩ i,
+    dsimp [std_simplex_to_convex_hull] at this, rw this,
+    exact lt_of_le_of_ne (h1.left i) (ne.symm (h2 i)) },
+  { intros x hx,
+    simp at hx,
+    have H : (λ i, b.coord i x) ∈ std_simplex ℝ ι,
+    { refine ⟨λ i, le_of_lt (hx i), _⟩, simp },
+    refine ⟨λ i, b.coord i x, ⟨H, _⟩, _⟩, 
+    { simp, intro i, exact ne.symm (ne_of_lt (hx i)) },
+    { apply b.ext_elem, intro i,
+      convert affine_basis_coord_take_std_simplex_to_convex_hull b ⟨(λ i, b.coord i x), H⟩ i } }
+end.
+
+lemma take_linear_combination_bij_on_std_simplex_of_affine_indep {E : Type*}
+  [normed_add_comm_group E] [normed_space ℝ E] {ι : Type*} [fintype ι] (v : ι → E)
+  (hv : affine_independent ℝ v)
+  : set.bij_on (take_linear_combination ℝ v) (std_simplex ℝ ι) (convex_hull ℝ (set.range v)) :=
+begin
+  refine ⟨set.maps_to'.mpr (subset_of_eq (take_linear_combination_image_of_std_simplex ℝ v)), _, _⟩,
+  { intros x hx y hy hxy,
+    rw affine_independent_iff_eq_of_fintype_affine_combination_eq at hv,
+    refine hv x y hx.right hy.right _,
+    convert hxy; symmetry,
+    { exact std_simplex_to_convex_hull_eq_affine_combination ℝ v ⟨x, hx⟩ },
+    { exact std_simplex_to_convex_hull_eq_affine_combination ℝ v ⟨y, hy⟩ } },
+  { exact subset_of_eq (eq.symm (take_linear_combination_image_of_std_simplex _ _)) }
+end
+
+noncomputable
+def convex_hull_of_affine_indep_homeo_std_simplex {E : Type*} [normed_add_comm_group E]
+  [normed_space ℝ E] {ι : Type*} [fintype ι] (v : ι → E) (hv : affine_independent ℝ v)
+  : convex_hull ℝ (set.range v) ≃ₜ std_simplex ℝ ι :=
+  homeomorph.symm (homeomorph_of_injective_quotient_map _ (std_simplex_to_convex_hull_is_quot_map v)
+                                                        ((set.injective_cod_restrict _).mpr
+                                                          ((take_linear_combination_bij_on_std_simplex_of_affine_indep v hv).inj_on.injective)))
+
+lemma set.image_diff_subset_of_inj_on {α β : Type*} {f : α → β} {s t : set α}
+  (hst : s ⊆ t) (hf : set.inj_on f t) : f '' (t \ s) = f '' t \ f '' s :=
+begin
+  refine subset_antisymm _ (set.subset_image_diff f t s),
+  rw set.image_subset_iff,
+  intros x hx,
+  refine ⟨set.mem_image_of_mem _ hx.left, _⟩,
+  rintro ⟨y, hy, H⟩, refine hx.right (eq.subst (hf (hst hy) hx.left H) hy)
+end
+
+lemma frontier_of_convex_hull_of_affine_basis {E : Type*}
+  [normed_add_comm_group E] [normed_space ℝ E] {ι : Type*} [fintype ι] (b : affine_basis ι ℝ E)
+  : take_linear_combination ℝ b.points '' (std_simplex ℝ ι ∩ { p | ∃ i, p i = 0 })
+  = frontier (convex_hull ℝ (set.range b.points)) :=
+begin
+  rw frontier_eq_inter_compl_interior,
+  rw [interior_compl, compl_compl, is_closed.closure_eq _],
+  { rw ← interior_of_convex_hull_of_affine_basis,
+    rw ← take_linear_combination_image_of_std_simplex,
+    rw ← set.diff_eq_compl_inter,
+    rw [← set.image_diff_subset_of_inj_on (set.diff_subset _ _),
+        sdiff_sdiff_right_self, set.inf_eq_inter],
+    exact (take_linear_combination_bij_on_std_simplex_of_affine_indep b.points b.ind).inj_on },
+  { apply set.finite.is_closed_convex_hull, exact set.finite_range _ }
+end
+
+lemma span_points_of_insert_zero (k : Type*) {V : Type*} [ring k] [add_comm_group V] [module k V]
+  (s : set V) : span_points k (insert (0 : V) s) = submodule.span k s :=
+begin
+  suffices : vector_span k (insert (0 : V) s) = submodule.span k s,
+  { simp [span_points], simp_rw this,
+    ext, split; intro h,
+    { obtain ⟨v, h1, w, h2, h3⟩ := h, subst h3,
+      cases h1, { rw h1, simp, exact h2 },
+      { simp, exact submodule.add_mem _ h2 (submodule.subset_span h1) } },
+    { exact ⟨0, or.inl rfl, x, h, (add_zero x).symm⟩ } },
+  { dsimp [vector_span],
+    refine le_antisymm _ (submodule.span_mono _),
+    { rw submodule.span_le,
+      intros x hx, 
+      obtain ⟨v, w, hv, hw, H⟩ := hx, subst H,
+      suffices : insert (0 : V) s ⊆ submodule.span k s,
+      { exact submodule.sub_mem (submodule.span k s) (this hv) (this hw) },
+      rw set.insert_subset,
+      exact ⟨(submodule.span k s).zero_mem, submodule.subset_span⟩ },
+    { intros x hx, refine ⟨x, 0, set.mem_insert_of_mem _ hx, set.mem_insert 0 s, sub_zero x⟩ } }
+end
+
+lemma sphere_homeo_topological_simplex_boundary (n : ℕ)
+  : nonempty (metric.sphere (0 : euclidean_space ℝ (fin n)) 1 ≃ₜ topological_simplex_boundary n) := 
+begin
+  by_cases n = 0,
+  { refine eq.mp _ (_ : nonempty ((∅ : set (euclidean_space ℝ (fin n))) ≃ₜ (∅ : set (fin (n + 1) → ℝ)))),
+    { suffices : ∅ = metric.sphere (0 : euclidean_space ℝ (fin n)) 1 ∧ ∅ = topological_simplex_boundary n,
+      { cases this with h1 h2, congr, exact h1, exact h2, ext, rw h1, ext, rw h2 },
+      convert and.intro _ (set.is_empty_coe_sort.mp boundary_of_zero_simplex_empty).symm;
+      try { exact congr_arg (λ k, @coe_sort simplex_category Type (concrete_category.has_coe_to_sort simplex_category) (simplex_category.mk k) → ℝ) h },
+      symmetry, refine set.eq_empty_of_forall_not_mem _, subst h,
+      intro x, dsimp [euclidean_space, pi_Lp] at x, fin_cases x, simp, rw euclidean_space.norm_eq,
+      rw finset.univ_eq_empty, simp },
+    { refine ⟨⟨⟨(λ x, false.elim x.property), (λ x, false.elim x.property),
+               (λ x, false.elim x.property), (λ x, false.elim x.property)⟩, _, _⟩⟩;
+      apply continuous_empty_function } },
+  suffices : nonempty ((coe : (metric.closed_ball (0 : euclidean_space ℝ (fin n)) 1) → euclidean_space ℝ (fin n)) ⁻¹'
+                       metric.sphere 0 1 ≃ₜ topological_simplex_boundary n),
+  { obtain ⟨G⟩ := this,
+    refine ⟨_⟩,
+    refine homeomorph.trans (homeomorph.symm (preim_of_subset_homeo_subset _)) G,
+    exact metric.sphere_subset_closed_ball },
+  let s := set.range (λ (i j : fin n), ite (i = j) (1 : ℝ) 0) ∪ {0},
+  have s_finite : s.finite := set.finite.union (set.finite_range _) (set.finite_singleton _),
+  let simplex : set (euclidean_space ℝ (fin n)) := convex_hull ℝ s,
+  let b : affine_basis (fin (n + 1)) ℝ (euclidean_space ℝ (fin n))
+    := ⟨fin.cons 0 (λ (i j : fin n), ite (i = j) (1 : ℝ) 0), _, _⟩,
+  have H : simplex = convex_hull ℝ (set.range b.points),
+  { refine congr_arg (convex_hull ℝ) _, rw fin.range_cons, exact set.union_singleton },
+  obtain ⟨F, hF⟩ := compact_convex_with_nonempty_interior_homeo_to_ball simplex (convex_convex_hull _ _)  _ _,
+  suffices : nonempty ((coe : simplex → euclidean_space ℝ (fin n)) ⁻¹' frontier simplex ≃ₜ topological_simplex_boundary n),
+  { obtain ⟨G⟩ := this,
+    refine ⟨homeomorph.trans (homeomorph.symm _) G⟩,
+    exact homeomorph.trans (embedding_restricts_to_homeomorph _ _ F.embedding) (homeomorph.set_congr hF) },
+  suffices : nonempty (frontier simplex ≃ₜ topological_simplex_boundary n),
+  { obtain ⟨G⟩ := this,
+    refine ⟨homeomorph.trans (preim_of_subset_homeo_subset _) G⟩,
+    exact is_closed.frontier_subset (set.finite.is_closed_convex_hull s_finite) },
+  suffices : nonempty (frontier (convex_hull ℝ (set.range b.points)) ≃ₜ topological_simplex_boundary n),
+  { obtain ⟨G⟩ := this,
+    exact ⟨homeomorph.trans (homeomorph.set_congr (congr_arg frontier H)) G⟩ },
+  { refine ⟨_⟩,
+    let G := convex_hull_of_affine_indep_homeo_std_simplex b.points b.ind,
+    refine homeomorph.trans (preim_of_subset_homeo_subset (is_closed.frontier_subset _)).symm
+                            (homeomorph.trans _ (preim_of_subset_homeo_subset (set.inter_subset_left _ _))),
+    { exact set.finite.is_closed_convex_hull (set.finite_range _) },
+    { convert homeomorph.trans (embedding_restricts_to_homeomorph _ G G.embedding) _,
+      suffices : G '' (coe ⁻¹' frontier (convex_hull ℝ (set.range b.points)))
+               = (coe : std_simplex ℝ (fin (n + 1)) → (fin (n + 1) → ℝ)) ⁻¹' topological_simplex_boundary n,
+      { exact homeomorph.set_congr this },
+      suffices : G ⁻¹' ((coe : std_simplex ℝ (fin (n + 1)) → (fin (n + 1) → ℝ)) ⁻¹' topological_simplex_boundary n)
+               = coe ⁻¹' frontier (convex_hull ℝ (set.range b.points)),
+      { refine eq.trans (congr_arg (λ s, G '' s) this.symm) _,
+        apply homeomorph.image_preimage },
+      rw ← homeomorph.image_symm,
+      ext x,
+      simp [G, convex_hull_of_affine_indep_homeo_std_simplex, std_simplex_to_convex_hull,
+            homeomorph_of_injective_quotient_map, equiv.to_homeomorph_of_inducing],
+      have := frontier_of_convex_hull_of_affine_basis b,
+      simp [b] at this, rw ← this,
+      simp [homeomorph.symm, set.cod_restrict, set.restrict],
+      simp_rw [subtype.ext_iff],
+      delta topological_simplex_boundary topological_simplex,
+      simp, 
+      simp_rw [and_assoc, and.left_comm, ← and_assoc],
+      simp [simplex_category.to_Top'_obj, simplex_category.mk],
+      refine eq.to_iff _, congr, ext : 1,
+      congr' 1,
+      rw [and.comm],
+      congr' 1, 
+      exact propext (and_self _) } },
+  { rw [H, ← interior_of_convex_hull_of_affine_basis, set.nonempty_image_iff],
+    refine ⟨(barycenter n).val, (barycenter n).property, _⟩,
+    simp [barycenter], norm_cast, exact nat.succ_ne_zero n },
+  { rw [H, ← take_linear_combination_image_of_std_simplex],
+    exact (compact_std_simplex (fin (n + 1))).image (take_linear_combination_cont _) },
+  { refine (affine_independent_iff_linear_independent_vsub ℝ _ 0).mpr _,
+    convert linear_independent.comp (basis.linear_independent (pi.basis_fun ℝ (fin n)))
+                                    (λ (i : {x : fin (n + 1) // x ≠ 0}), fin.pred i.val i.property) _,
+    { ext i, cases i with i hi, simp,
+      cases i with i hi', cases i, exfalso, exact hi rfl,
+      have : fin.succ ⟨i, nat.lt_of_succ_lt_succ hi'⟩ = ⟨i.succ, hi'⟩ :=
+        fin.succ_mk n i (nat.lt_of_succ_lt_succ hi'), 
+      simp_rw ← this, rw fin.cons_succ, cases x with j hj,
+      split_ifs with h'; simp at h',
+      { symmetry, convert linear_map.std_basis_same ℝ (λ _, ℝ) _ _, simp [fin.pred], exact h' },
+      { symmetry, convert linear_map.std_basis_ne ℝ (λ _, ℝ) _ _ _ _, simp [fin.pred], exact ne.symm h' } },
+    { rintros ⟨i, hi⟩ ⟨j, hj⟩ H, simp at H ⊢, exact H } },
+  { rw [eq_top_iff, fin.range_cons],
+    rw [affine_subspace.le_def, affine_subspace.top_coe, coe_affine_span,
+        span_points_of_insert_zero],
+    rw [← @submodule.top_coe ℝ (euclidean_space ℝ (fin n)), set_like.coe_subset_coe, ← eq_top_iff],
+    exact (pi.basis_fun ℝ (fin n)).span_eq }
+end.
+
+lemma zeroth_homology_of_zero_sphere {R : Type*} [comm_ring R] [nontrivial R]
+  : is_isomorphic ((singular_homology R 0).obj (Top.of (metric.sphere (0 : euclidean_space ℝ (fin 1)) 1)))
+                  ((Module.free R).obj (fin 2)) :=
+begin
+  obtain ⟨G⟩ := sphere_homeo_topological_simplex_boundary 1,
+  exact ⟨(singular_homology R 0).map_iso (@Top.iso_of_homeo (Top.of (metric.sphere (0 : euclidean_space ℝ (fin 1)) 1)) 
+                                                            (Top.of (topological_simplex_boundary 1)) G)
+         ≪≫ zeroth_homology_of_boundary_of_one_simplex⟩
+end
+
+lemma nth_homology_of_n_sphere {R : Type*} [comm_ring R] [nontrivial R] (n : ℕ) (hn : n > 0)
+  : is_isomorphic ((singular_homology R n).obj (Top.of (metric.sphere (0 : euclidean_space ℝ (fin (n + 1))) 1)))
+                  (Module.of R R) :=
+begin
+  obtain ⟨G⟩ := sphere_homeo_topological_simplex_boundary (n + 1),
+  exact ⟨(singular_homology R n).map_iso (@Top.iso_of_homeo (Top.of (metric.sphere (0 : euclidean_space ℝ (fin (n + 1))) 1)) 
+                                                            (Top.of (topological_simplex_boundary (n + 1))) G)
+         ≪≫ nth_homology_of_boundary_of_n_plus_one_simplex n hn⟩
+end

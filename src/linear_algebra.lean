@@ -322,3 +322,17 @@ def basis.quotient_basis (ι : Type*) (R : Type*) (M : Type*) [ring R] [add_comm
        { refl } },
   basis.mk h1 h2.
 
+lemma basis_constr_of_lin_indep_family_injective {ι : Type*} {R : Type*} {M : Type*} {M' : Type*}
+  [comm_ring R] [nontrivial R] [add_comm_group M] [module R M] [add_comm_group M'] [module R M']
+  (b : basis ι R M) (f : ι → M') (hf : linear_independent R f)
+  : function.injective (basis.constr b R f) :=
+begin
+  rw [← linear_map.ker_eq_bot, linear_map.ker_eq_bot'],
+  intros m hm,
+  simp [basis.constr] at hm,
+  rw finsupp.total_map_domain at hm, swap, { exact hf.injective },
+  rw function.comp.left_id at hm,
+  rw linear_independent_iff at hf,
+  specialize hf _ hm,
+  rw linear_equiv.map_eq_zero_iff at hf, exact hf
+end
