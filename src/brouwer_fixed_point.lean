@@ -217,6 +217,27 @@ begin
   { norm_cast, exact nat.zero_le 4 }
 end
 
+/-
+Proof sketch, due to Ivo Vekemans (see https://www.ivovekemans.net/mathematical-art):
+
+I slept.
+And slumbering dreamt.
+And dreaming, I ambled clockwise around a great circular lake in an infinite desert.
+And ambling, caught my sweater on a thorn, and began to unravel.
+And unravelling, I saw all the points of the lake.
+And observed, the lake began to stir.
+And stirring, the surface did not break, remaining contained.
+And contained, the visited a violent vortex, but STILL the surface did not break.
+And unbroken, the whirring pool... ...subsided, as the last sweater thread unwound.
+And unwound in the setting sun I spied again the thorn.
+And spying, noticed that no point on the lake was where it began.
+And beginning at each point emanated a single ray of light, through the point it was prior perturbation, each ray illuminating a spot on the shore.
+And sure that the points perturbed from the bank illuminated those points from whence they came, I tied the ends of my sweater together and HEAVED. And heaved and heaved.
+And, so heft, the thread, without breaking or crossing the lake, rewound unto me a complete sweater.
+And sweating from the exertion, I woke.
+And waking, recalled that one is not zero, snapping the thread.
+-/
+
 lemma brouwer_fixed_point_for_sphere (n : ℕ)
   (f : C(metric.closed_ball (0 : euclidean_space ℝ (fin n)) 1,
          metric.closed_ball (0 : euclidean_space ℝ (fin n)) 1))
