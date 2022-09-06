@@ -86,11 +86,11 @@ notation `⟪`x`, `y`⟫` := @inner ℝ _ _ x y
 
 noncomputable
 def time_to_boundary (n : ℕ) (p q : euclidean_space ℝ (fin n)) : ℝ :=
-  (real.sqrt (4 * ⟪p - q, q⟫^2 + 4 * ∥p - q∥^2 * (1 - ∥q∥^2)) - 2 * ⟪p - q, q⟫) / (2 * ∥p - q∥^2)
+  (2 * ⟪q - p, q⟫ - real.sqrt (4 * ⟪q - p, q⟫^2 + 4 * ∥p - q∥^2 * (1 - ∥q∥^2))) / (2 * ∥p - q∥^2)
 
 noncomputable
 def time_to_boundary_aux (x : { tuple : ℝ × ℝ × ℝ // tuple.snd.fst > 0 ∧ tuple.snd.snd ≤ 1 }) : ℝ :=
-  (real.sqrt (4 * x.val.fst^2 + 4 * x.val.snd.fst^2 * (1 - x.val.snd.snd^2)) - 2 * x.val.fst) / (2 * x.val.snd.fst^2)
+  (2 * x.val.fst - real.sqrt (4 * x.val.fst^2 + 4 * x.val.snd.fst^2 * (1 - x.val.snd.snd^2))) / (2 * x.val.snd.fst^2)
 
 noncomputable
 def time_to_boundary' (n : ℕ) (pair : { x : metric.closed_ball (0 : euclidean_space ℝ (fin n)) 1
@@ -103,7 +103,7 @@ def time_to_boundary'_aux (n : ℕ) (pair : { x : metric.closed_ball (0 : euclid
                                               × metric.closed_ball (0 : euclidean_space ℝ (fin n)) 1
                                               // x.fst ≠ x.snd })
   : { tuple : ℝ × ℝ × ℝ // tuple.snd.fst > 0 ∧ tuple.snd.snd ≤ 1 } := {
-    val := ⟨⟪pair.val.fst.val - pair.val.snd.val, pair.val.snd⟫,
+    val := ⟨⟪pair.val.snd.val - pair.val.fst.val, pair.val.snd⟫,
             ∥pair.val.fst.val - pair.val.snd.val∥,
             ∥pair.val.snd.val∥⟩,
     property := by { split; simp, { rw [sub_eq_zero, ← subtype.ext_iff], exact pair.property },
@@ -125,8 +125,8 @@ begin
   { refine continuous_subtype_mk _ _, 
     refine continuous.prod_mk _ ((continuous_norm.comp _).prod_mk (continuous_norm.comp _)),
     { refine continuous.inner _ _,
-      { exact continuous.sub (continuous_subtype_val.comp (continuous_fst.comp continuous_subtype_val))
-                             (continuous_subtype_val.comp (continuous_snd.comp continuous_subtype_val)) },
+      { exact continuous.sub (continuous_subtype_val.comp (continuous_snd.comp continuous_subtype_val))
+                             (continuous_subtype_val.comp (continuous_fst.comp continuous_subtype_val)) },
       { exact continuous_subtype_coe.comp (continuous_snd.comp continuous_subtype_val) } },
     { exact continuous.sub (continuous_subtype_val.comp (continuous_fst.comp continuous_subtype_val))
                              (continuous_subtype_val.comp (continuous_snd.comp continuous_subtype_val)) },
@@ -155,23 +155,18 @@ begin
     symmetry,
     rw [mul_comm t _, mul_comm, pow_two, ← mul_assoc, ← sub_eq_zero, add_sub_assoc],
     rw real.quadratic_eq_zero_iff,
-    { left,
+    { right,
       rw ← h, delta time_to_boundary' time_to_boundary discrim,
-      congr,
-      { rw [sub_eq_neg_add], congr' 1,
-        { rw [← real_inner_smul_right, mul_comm, ← real_inner_smul_right,
-              mul_comm, ← real_inner_smul_right, ← inner_sub_left], refl },
-        { refine congr_arg _ _,
-          rw [← real_inner_self_eq_norm_sq, ← real_inner_self_eq_norm_sq, inner_sub_left, sub_sq],
-          refine eq.trans _ (sub_eq_add_neg _ _).symm,
-          rw [← mul_neg, neg_sub, sub_sq, mul_add, mul_sub],
-          congr' 2,
-          { congr' 1,
-            { rw [mul_pow, mul_comm], congr, norm_cast },
-            { ring } },
-          { rw [mul_pow, mul_comm], congr, norm_cast },
-          { congr, rw real_inner_sub_sub_self, ring } } },
-      { rw [← real_inner_self_eq_norm_sq, real_inner_sub_sub_self], ring } },
+      congr' 2,
+      { rw [neg_sub, mul_comm, inner_sub_left, sub_mul], refl },
+      { refine congr_arg _ _,
+        rw [← real_inner_self_eq_norm_sq, real_inner_sub_sub_self, inner_sub_left], 
+        rw [← neg_sq, neg_sub, ← sub_mul, mul_pow, mul_comm],
+        congr, norm_cast,
+        rw [← mul_neg, neg_sub, ← real_inner_self_eq_norm_sq,
+            sub_eq_add_neg, add_assoc, mul_comm (2 : ℝ)], refl },
+      { rw [← real_inner_self_eq_norm_sq, real_inner_sub_sub_self,
+            sub_eq_add_neg, add_assoc, mul_comm (2 : ℝ)], refl } },
     { refine ne_of_eq_of_ne _ (sq_eq_zero_iff.not.mpr (norm_ne_zero_iff.mpr (sub_ne_zero.mpr (subtype.ext_iff.not.mp pair.property)))),
       rw [← real_inner_self_eq_norm_sq, real_inner_sub_sub_self], ring },
     { delta discrim,
@@ -205,17 +200,21 @@ end.
 -- simp only [prod.fst, prod.snd, subtype.coe_mk],
 
 lemma time_to_boundary_eq_zero_if_in_boundary (n : ℕ) (p q : euclidean_space ℝ (fin n)) 
-  (h : q ∈ metric.sphere (0 : euclidean_space ℝ (fin n)) 1)
+  (h1 : p ∈ metric.closed_ball (0 : euclidean_space ℝ (fin n)) 1)
+  (h2 : q ∈ metric.sphere (0 : euclidean_space ℝ (fin n)) 1)
   : time_to_boundary n p q = 0 :=
 begin
-  simp at h,
+  simp at h1 h2,
   simp only [div_eq_zero_iff, time_to_boundary],
   left,
-  rw [h, one_pow, sub_self, mul_zero, add_zero, real.sqrt_mul, sub_eq_zero], 
-  congr,
+  rw [h2, one_pow, sub_self, mul_zero, add_zero, real.sqrt_mul, sub_eq_zero], 
+  symmetry, congr,
   { rw real.sqrt_eq_iff_sq_eq; norm_cast; apply nat.zero_le },
   { apply real.sqrt_sq,
-     }
+    rw [inner_sub_left, sub_nonneg, real_inner_self_eq_norm_mul_norm],
+    refine le_trans (real_inner_le_norm _ _) _,
+    rw h2, simp, exact h1 },
+  { norm_cast, exact nat.zero_le 4 }
 end
 
 lemma brouwer_fixed_point_for_sphere (n : ℕ)
@@ -247,5 +246,30 @@ begin
   refine ⟨r, _⟩,
   intros x h,
   simp [r, mk_pair, time_to_boundary'],
+  rw time_to_boundary_eq_zero_if_in_boundary n _ _ (subtype.mem _) h,
+  simp
+end.
 
+theorem brouwer_fixed_point {V : Type*}
+  [normed_add_comm_group V] [normed_space ℝ V] [finite_dimensional ℝ V]
+  : ∀ (s : set V), convex ℝ s → is_compact s → set.nonempty s → 
+    ∀ (f : C(s, s)), ∃ x, f x = x :=
+begin
+  intros s h1 h2 h3,
+  have : affine_dim ℝ s < cardinal.aleph_0, 
+  { apply @lt_of_le_of_lt _ _ _ (module.rank ℝ V),
+    { dsimp [affine_dim],
+      rw [← finite_dimensional.finrank_eq_dim, ← finite_dimensional.finrank_eq_dim],
+      norm_cast,
+      apply submodule.finrank_le },
+    { rw ← finite_dimensional.finrank_eq_dim, exact cardinal.nat_lt_aleph_0 _ } },
+  rw cardinal.lt_aleph_0 at this, 
+  obtain ⟨n, hn⟩ := this,
+  obtain ⟨F⟩ := convex_compact_homeo_to_ball s h1 h2 h3 n hn,
+  intro f, 
+  let g := F.to_continuous_map.comp (f.comp F.symm.to_continuous_map),
+  obtain ⟨y, hy⟩ := brouwer_fixed_point_for_sphere n g,
+  refine ⟨F.symm y, _⟩,
+  rw [← homeomorph.coe_symm_to_equiv, equiv.eq_symm_apply],
+  exact hy
 end
