@@ -24,9 +24,7 @@ end
 lemma surjection_of_compact_hausdorff_is_quot_map {α β} [topological_space α] [topological_space β]
   [compact_space α] [t2_space β]
   (f : α → β) : function.surjective f → continuous f → quotient_map f :=
-λ hSurj hCont, quotient_map_of_is_closed_map f hSurj
-                                             (λ C hC, (hC.is_compact.image hCont).is_closed)
-                                             hCont
+λ hSurj hCont, quotient_map_of_is_closed_map f hSurj hCont.is_closed_map hCont
 
 noncomputable
 def lift_along_quot_map {α β γ : Top} (q : α ⟶ β) (f : α ⟶ γ) (Hquot : quotient_map q)
@@ -61,14 +59,12 @@ universe u
 noncomputable
 def cylinder : Top.{u} ⥤ Top.{u} := {
   obj := λ X, Top.of (unit_interval × X),
-  map := λ X Y f, continuous_map.mk (λ p : unit_interval × X, (p.fst, f p.snd))
-                                    (continuous.prod_mk continuous_fst
-                                      (continuous.comp f.continuous continuous_snd)),
-  map_id' := by { intros, ext p, cases p, simp, refl },
-  map_comp' := by { intros, ext p, cases p, simp, refl },
+  map := λ X Y f, (continuous_map.id _).prod_map f,
+  map_id' := by { intros, ext1 ⟨x, y⟩, refl },
+  map_comp' := by { intros, ext1 ⟨x, y⟩, refl },
 }
 
-def homeomorph.Pi_to_subtype
+def homeomorph.subtype_pi_homeomorph_pi
   {α : Type*} {β : α → Type*} {P : Π (a : α), β a → Prop}
   [τ : Π (a : α), topological_space (β a)]
   : { f : Π (a : α), β a // ∀ a, P a (f a) } ≃ₜ (Π (a : α), { b // P a b }) :=
@@ -87,20 +83,17 @@ variables {E : Type*} [add_comm_group E] [module ℝ E] [topological_space E]
   [has_continuous_add E] [has_continuous_smul ℝ E] {s : set E} {x : E}
 
 /-- A non-empty star convex set is a contractible space. -/
-def star_convex.contraction (h : star_convex ℝ x s) (h' : s.nonempty) :
-  (continuous_map.id s).homotopy
-    (continuous_map.const s ⟨x, star_convex.mem h h'⟩) := {
-    to_fun := λ p, ⟨p.1.1 • x + (1 - p.1.1) • p.2,
+def star_convex.contraction (x : s) (h : star_convex ℝ (x : E)  s) :
+  (continuous_map.id s).homotopy (continuous_map.const s x) :=
+{ to_fun := λ p, ⟨p.1.1 • x + (1 - p.1.1) • p.2,
                     h p.2.2 p.1.2.1 (sub_nonneg.2 p.1.2.2) (add_sub_cancel'_right _ _)⟩,
-    map_zero_left' := λ _, by simp,
-    map_one_left' := λ _, by simp,
-  }
+  map_zero_left' := λ _, by simp,
+  map_one_left' := λ _, by simp, }
 
 /-- A non-empty convex set is a contractible space. -/
-noncomputable
-lemma convex.contraction (hs : convex ℝ s)
-  : Π (x0 : s), (continuous_map.id s).homotopy (continuous_map.const s x0)
-| ⟨x0, h⟩ := (hs.star_convex h).contraction ⟨x0, h⟩
+def convex.contraction (hs : convex ℝ s) (x0 : s) :
+  (continuous_map.id s).homotopy (continuous_map.const s x0) :=
+(hs.star_convex x0.coe_prop).contraction x0
 
 noncomputable
 def embedding.pullback {α β γ : Type*} [topological_space α] [topological_space β]
