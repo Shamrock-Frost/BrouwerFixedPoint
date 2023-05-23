@@ -60,12 +60,10 @@ def spanned_by_sat_basis (R : Type u) [comm_ring R] (M : Type w) [add_comm_monoi
     (finsupp.supported_equiv_finsupp s)) }
 
 lemma spanned_by_sat_basis_apply (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid M] [module R M]
-                                 {ι : Type p} (b : basis ι R M) (s : set ι)
-                                 (i : ι) (hi : i ∈ s)
-                                 : spanned_by_sat_basis R M b s ⟨i, hi⟩
-                                 = ⟨b i, submodule.subset_span (set.mem_image_of_mem b hi)⟩ :=
+  {ι : Type p} (b : basis ι R M) (s : set ι) (i : s) :
+  spanned_by_sat_basis R M b s i = ⟨b i, submodule.subset_span (set.mem_image_of_mem b i.2)⟩ :=
 begin
-  apply subtype.eq, simp [spanned_by_sat_basis],
+  apply subtype.eq, simp [spanned_by_sat_basis]
 end
 
 def subcomplex_spanned_by (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}

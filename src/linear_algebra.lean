@@ -6,6 +6,12 @@ import algebra.homology.Module
 import algebra.homology.homotopy
 import algebra.big_operators.finsupp
 
+@[simp]
+lemma finsupp.supported_equiv_finsupp_symm_apply_coe {α M R : Type*} [semiring R] [add_comm_monoid M]
+  [module R M] (s : set α) (f : s →₀ M):
+  (((finsupp.supported_equiv_finsupp s).symm f : finsupp.supported M R s) : α →₀ M) =
+    f.map_domain (coe : s → α) := rfl
+
 lemma submodule_restrict_app {R : Type*}
   {M₁ : Type*} {M₂ : Type*} {M₃ : Type*}
   [semiring R] [add_comm_monoid M₁] [add_comm_monoid M₂] [add_comm_monoid M₃]
