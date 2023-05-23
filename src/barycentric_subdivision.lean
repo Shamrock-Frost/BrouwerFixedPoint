@@ -466,7 +466,7 @@ lemma convex_combination_cont {ι' : Type} [fintype ι'] [nonempty ι']
        { exact continuous.snd' (continuous_apply i_1) },
        { exact continuous.fst' (continuous_apply_apply i_1 i) } },
   (homeomorph.subtype_prod_equiv_prod.trans
-    (homeomorph.Pi_to_subtype.prod_congr (homeomorph.refl _))).comp_continuous_iff'.mp
+    (homeomorph.subtype_pi_homeomorph_pi.prod_congr (homeomorph.refl _))).comp_continuous_iff'.mp
     (continuous.congr 
      (continuous.cod_restrict (this.comp continuous_subtype_val)
                               (λ p, convex.sum_mem hConvex (λ i _, p.property.right.left i)
