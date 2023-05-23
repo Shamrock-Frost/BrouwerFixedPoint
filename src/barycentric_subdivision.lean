@@ -15,7 +15,20 @@ universes u v w p
 def spanned_by_sat (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid M] [module R M]
                    {ι : Type*} (b : basis ι R M) (s : set ι)
                    : submodule R M :=
-  submodule.span R (b '' { i | i ∈ s })
+  submodule.span R (b '' s)
+
+lemma basis.mem_spanned_by_sat {R : Type*} [comm_ring R] {M : Type*} [add_comm_monoid M] [module R M]
+                   {ι : Type*} (b : basis ι R M) {s : set ι} {x : M}
+                   : x ∈ spanned_by_sat R M b s ↔ ∀ i, b.repr x i ≠ 0 → i ∈ s :=
+b.mem_span_image_iff
+
+lemma basis.map_repr_spanned_by_sat {R M ι : Type*} [comm_ring R] [add_comm_monoid M] [module R M]
+  (b : basis ι R M) (s : set ι) :
+  (spanned_by_sat R M b s).map (b.repr : M →ₗ[R] (ι →₀ R)) = finsupp.supported R R s :=
+begin
+  rw [spanned_by_sat, b.span_image, submodule.map_comap_eq_of_surjective],
+  exact b.repr.surjective
+end
 
 lemma finsupp.subtype_domain_single {α : Type*} {M : Type*} [has_zero M]
   (p : α → Prop) (a : α) (ha : p a) (m : M)
@@ -42,40 +55,9 @@ end
 noncomputable
 def spanned_by_sat_basis (R : Type u) [comm_ring R] (M : Type w) [add_comm_monoid M] [module R M]
                          {ι : Type p} (b : basis ι R M) (s : set ι)
-                         : basis s R (spanned_by_sat R M b s) := {
-  repr := {
-    to_fun := λ x, @finsupp.lsubtype_domain ι R R _ _ _ s (b.repr x),
-    inv_fun := λ f, ⟨b.repr.inv_fun (finsupp.lmap_domain R R subtype.val f), 
-                     by { dsimp [spanned_by_sat],
-                          rw basis.mem_span_iff _ b _ (set.image_subset_range _ _),
-                          intros i hi,
-                          simp [finsupp.map_domain] at hi,
-                          obtain ⟨j, h, h'⟩ := finset.exists_ne_zero_of_sum_ne_zero hi,
-                          simp at h', have h'' := finsupp.single_apply_ne_zero.mp h',
-                          rw h''.left,
-                          exact set.mem_image_of_mem _ j.property }⟩,
-    map_add' := by { rintros ⟨x, hx⟩ ⟨y, hy⟩, dsimp, repeat { rw map_add } },
-    map_smul' := by { rintros r ⟨x, hx⟩, dsimp, repeat { rw map_smul } },
-    left_inv := by { rintro ⟨x, hx⟩, ext, rw subtype.coe_mk,
-                     suffices : set.eq_on ((((b.repr.symm : (ι →₀ R) →ₗ[R] M).comp
-                                             (finsupp.lmap_domain R R subtype.val)).comp
-                                             (finsupp.lsubtype_domain s)).comp
-                                             (b.repr : M →ₗ[R] (ι →₀ R)))
-                                          (@linear_map.id R M _ _ _)
-                                          (b '' { i | i ∈ s }),
-                     { exact linear_map.eq_on_span this hx },
-                     rintros y ⟨i, hi, h⟩, subst h,
-                     dsimp [finsupp.lsubtype_domain],
-                     rw basis.repr_self,
-                     rw finsupp.subtype_domain_single (λ x, x ∈ s) i hi,
-                     rw finsupp.map_domain_single,
-                     exact basis.repr_symm_single_one b i },
-    right_inv := by { intro f, ext i,
-                      dsimp [finsupp.lsubtype_domain],
-                      rw linear_equiv.apply_symm_apply,
-                      exact finsupp.map_domain_apply subtype.val_injective f i }
-  }
-}
+                         : basis s R (spanned_by_sat R M b s) :=
+{ repr := (b.repr.submodule_map _).trans ((linear_equiv.of_eq _ _ (b.map_repr_spanned_by_sat s)).trans
+    (finsupp.supported_equiv_finsupp s)) }
 
 lemma spanned_by_sat_basis_apply (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid M] [module R M]
                                  {ι : Type p} (b : basis ι R M) (s : set ι)
