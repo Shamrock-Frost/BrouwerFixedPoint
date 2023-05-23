@@ -69,7 +69,7 @@ end
 local attribute [instance] classical.prop_decidable
 universes u v w
 
-lemma basis.mem_span_iff (R : Type u) [comm_ring R] {M : Type v}
+lemma basis.mem_span_iff (R : Type u) [ring R] {M : Type v}
   [add_comm_monoid M] [module R M] {ι : Type w}
   (b : basis ι R M) (S : set M) (hS : S ⊆ set.range b) (x : M)
   : x ∈ submodule.span R S ↔ (∀ i, b.repr x i ≠ 0 → b i ∈ S) :=
@@ -139,7 +139,7 @@ begin
       { symmetry, apply this } } }
 end
 
-lemma submodule.inf_spans_free (R : Type) [comm_ring R] {M : Type*}
+lemma submodule.inf_spans_free (R : Type) [ring R] {M : Type*}
   [add_comm_monoid M] [module R M] {ι : Type*}
   (b : basis ι R M)
   (S T : set M) (hS : S ⊆ set.range b) (hT : T ⊆ set.range b)
@@ -155,7 +155,7 @@ begin
     split; intros i hi, { exact (h i hi).left }, { exact (h i hi).right } }
 end
 
-lemma submodule.sup_spans (R : Type) [comm_ring R] {M : Type*}
+lemma submodule.sup_spans (R : Type) [ring R] {M : Type*}
   [add_comm_monoid M] [module R M] (S T : set M)
   : submodule.span R S ⊔ submodule.span R T = submodule.span R (S ∪ T) :=
 begin
@@ -220,9 +220,12 @@ def basis.quotient_basis (ι : Type*) (R : Type*) (M : Type*) [ring R] [add_comm
              obtain ⟨b, hb, hb'⟩ := ha, subst hb',
              simp, convert hb,
              exact b.out_eq },
-           { intros, rw ite_eq_left_iff.mpr _, swap, { intros, contradiction },
-             simp [v],
-             refl } },
+           { intros, 
+             rw ite_eq_left_iff.mpr _,
+             swap,
+             { intros, contradiction },
+             simp only [v, submodule.mkq_apply, submodule.quotient.mk_smul],
+             refl } }, 
          rw h at h',
          simp at h',
          have H' : N = submodule.span R ((λ i : ι, b (quot.mk s.r i).out - b i) '' { i | (quot.mk s.r i).out ≠ i }),
@@ -323,9 +326,9 @@ def basis.quotient_basis (ι : Type*) (R : Type*) (M : Type*) [ring R] [add_comm
   basis.mk h1 h2.
 
 lemma basis_constr_of_lin_indep_family_injective {ι : Type*} {R : Type*} {M : Type*} {M' : Type*}
-  [comm_ring R] [nontrivial R] [add_comm_group M] [module R M] [add_comm_group M'] [module R M']
+  [ring R] [nontrivial R] [add_comm_group M] [module R M] [add_comm_group M'] [module R M']
   (b : basis ι R M) (f : ι → M') (hf : linear_independent R f)
-  : function.injective (basis.constr b R f) :=
+  : function.injective (basis.constr b ℤ f) :=
 begin
   rw [← linear_map.ker_eq_bot, linear_map.ker_eq_bot'],
   intros m hm,
