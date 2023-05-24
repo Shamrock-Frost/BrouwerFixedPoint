@@ -59,9 +59,9 @@ def walking_arrow.commutative_square_to_nat_trans_app {C : Type*} [category C] {
 | source := u
 | target := v
 
-def arrow_category_iso_functor_category (C : Type*) [category C]
-  : Cat.of (arrow C) ≅ Cat.of (walking_arrow ⥤ C) := {
-  hom := {
+-- we actually have a strict isomorphism of categories, is this all worth it?
+def arrow.to_walking_arrow_functor (C : Type*) [category C]
+  : arrow C ⥤ (walking_arrow ⥤ C) := {
     obj := λ f, walking_arrow.morphism_to_functor f.hom,
     map := λ f g w, {
       app := walking_arrow.commutative_square_to_nat_trans_app f.hom g.hom _ _ w.w,
@@ -72,34 +72,142 @@ def arrow_category_iso_functor_category (C : Type*) [category C]
     },
     map_id' := by { intro X, ext i, cases i; refl },
     map_comp' := by { intros X Y Z f g, ext i, cases i; refl }
-  },
-  inv := {
+  }
+
+def walking_arrow_functor.to_arrow (C : Type*) [category C]
+  : (walking_arrow ⥤ C) ⥤ arrow C := {
     obj := λ f, arrow.mk (f.map walking_arrow_hom.arr),
     map := λ f g η, arrow.hom_mk (η.naturality walking_arrow_hom.arr).symm
-  },
-  hom_inv_id' := by { apply functor.hext,
-                      { rintro ⟨_, _, f⟩, refl },
-                      { rintros ⟨_, _, f⟩ ⟨_, _, g⟩ ⟨u, v, w⟩, refl } },
-  inv_hom_id' := by { apply category_theory.functor.ext, swap,
-                      { rintro ⟨f_obj, f_map, hf1, hf2⟩, apply functor.hext,
-                        { intro i, cases i; refl },
-                        { intros i j a, cases a,
-                          { refine heq_of_eq_of_heq (category_theory.functor.map_id _ i)
-                                    (heq_of_heq_of_eq _ (category_theory.functor.map_id _ i).symm), 
-                            congr' 1, cases i; refl },
-                          { refl } } },
-                      { rintro ⟨f_obj, f_map, hf1, hf2⟩ ⟨g_obj, g_map, hg1, hg2⟩ ⟨η, hη⟩,
-                        rw Cat.comp_map, dsimp,
-                        ext i, cases i; rw Cat.id_map;
-                        repeat { rw nat_trans.comp_app };
-                        rw [eq_to_hom_app, eq_to_hom_app, eq_to_hom_refl, eq_to_hom_refl,
-                            category.id_comp, category.comp_id]; refl } }
+  }
+
+def arrow.ident_iso_to_walking_to_arrow (C : Type*) [category C]
+  :  𝟭 (arrow C) ≅ arrow.to_walking_arrow_functor C ⋙ walking_arrow_functor.to_arrow C := {
+    hom := {
+      app := λ X, match X with ⟨l, r, f⟩ := 𝟙 (arrow.mk f) end,
+      naturality' := by {
+        rintros ⟨l, r, f⟩ ⟨l', r', g⟩ ⟨ϕ, ψ, w⟩,
+        ext,
+        { rw [functor.id_map, comma.comp_left, functor.comp_map],
+          dsimp [arrow.ident_iso_to_walking_to_arrow._match_1],
+          refine eq.trans (congr_arg2 _ rfl comma.id_left) _,
+          rw [category.comp_id],
+          refine eq.trans (category.id_comp _).symm _,
+          exact congr_arg2 _ (eq.symm comma.id_left) rfl },
+        { rw [functor.id_map, comma.comp_right, functor.comp_map],
+          dsimp [arrow.ident_iso_to_walking_to_arrow._match_1],
+          refine eq.trans (congr_arg2 _ rfl comma.id_right) _,
+          rw [category.comp_id],
+          refine eq.trans (category.id_comp _).symm _,
+          exact congr_arg2 _ (eq.symm comma.id_right) rfl }
+      }
+    },
+    inv := {
+      app := λ X, match X with ⟨l, r, f⟩ := 𝟙 (arrow.mk f) end,
+      naturality' := by {
+        rintros ⟨l, r, f⟩ ⟨l', r', g⟩ ⟨ϕ, ψ, w⟩,
+        ext,
+        { rw [functor.id_map, comma.comp_left, functor.comp_map],
+          dsimp [arrow.ident_iso_to_walking_to_arrow._match_2],
+          refine eq.trans (congr_arg2 _ rfl comma.id_left) _,
+          rw [category.comp_id],
+          refine eq.trans (category.id_comp _).symm _,
+          exact congr_arg2 _ (eq.symm comma.id_left) rfl },
+        { rw [functor.id_map, comma.comp_right, functor.comp_map],
+          dsimp [arrow.ident_iso_to_walking_to_arrow._match_2],
+          refine eq.trans (congr_arg2 _ rfl comma.id_right) _,
+          rw [category.comp_id],
+          refine eq.trans (category.id_comp _).symm _,
+          exact congr_arg2 _ (eq.symm comma.id_right) rfl }
+      }
+    },
+    hom_inv_id' := by {
+      ext x; cases x with l r f,
+      { simp only [nat_trans.comp_app, nat_trans.id_app, arrow.id_left,
+                   arrow.ident_iso_to_walking_to_arrow._match_1, 
+                   arrow.ident_iso_to_walking_to_arrow._match_2],
+        rw category.id_comp (𝟙 (arrow.mk f)),
+        exact comma.id_left },
+      { simp only [nat_trans.comp_app, nat_trans.id_app, arrow.id_right,
+                   arrow.ident_iso_to_walking_to_arrow._match_1, 
+                   arrow.ident_iso_to_walking_to_arrow._match_2],
+        rw category.id_comp (𝟙 (arrow.mk f)),
+        exact comma.id_right }
+    },
+    inv_hom_id' := by {
+      ext x; cases x with l r f,
+      { simp only [nat_trans.comp_app, nat_trans.id_app, arrow.id_left,
+                   arrow.ident_iso_to_walking_to_arrow._match_1, 
+                   arrow.ident_iso_to_walking_to_arrow._match_2],
+        rw category.id_comp (𝟙 (arrow.mk f)),
+        exact comma.id_left },
+      { simp only [nat_trans.comp_app, nat_trans.id_app, arrow.id_right,
+                   arrow.ident_iso_to_walking_to_arrow._match_1, 
+                   arrow.ident_iso_to_walking_to_arrow._match_2],
+        rw category.id_comp (𝟙 (arrow.mk f)),
+        exact comma.id_right }
+    }
+  }.
+
+def walking_arrow_functor.to_arrow_to_walking_iso_ident (C : Type*) [category C]
+  : walking_arrow_functor.to_arrow C ⋙ arrow.to_walking_arrow_functor C
+  ≅ 𝟭 (walking_arrow ⥤ C) := {
+    hom := {
+      app := λ F, {
+        app := λ X, match X with 
+                    | source := 𝟙 (F.obj source)
+                    | target := 𝟙 (F.obj target)
+                    end,
+        naturality' := by { intros X Y f, cases f,
+                            { cases X;
+                              refine eq.trans (category.id_comp _)
+                                              (eq.trans (eq.symm (F.map_id _))
+                                                        (category.id_comp _).symm) },
+                            { exact eq.trans (category.comp_id _) (category.id_comp _).symm } }
+      },
+      naturality' := by {
+        intros F G η,
+        ext x, cases x;
+        exact eq.trans (category.comp_id _) (category.id_comp _).symm
+      }
+    },
+    inv := {
+      app := λ F, {
+        app := λ X, match X with 
+                    | source := 𝟙 (F.obj source)
+                    | target := 𝟙 (F.obj target)
+                    end,
+        naturality' := by { intros X Y f, cases f,
+                            { cases X;
+                              refine eq.trans (category.comp_id _)
+                                              (eq.trans (F.map_id _)
+                                                        (category.comp_id _).symm) },
+                            { exact eq.trans (category.comp_id _) (category.id_comp _).symm } }
+      },
+      naturality' := by {
+        intros F G η,
+        ext x, cases x;
+        exact eq.trans (category.comp_id _) (category.id_comp _).symm
+      }
+    },
+    hom_inv_id' := by { ext F j, cases j; exact category.id_comp _ },
+    inv_hom_id' := by { ext F j, cases j; exact category.id_comp _ }
+  }
+
+def arrow_category_equiv_functor_category (C : Type*) [category C]
+  : arrow C ≌ (walking_arrow ⥤ C) := {
+  functor := arrow.to_walking_arrow_functor C,
+  inverse := walking_arrow_functor.to_arrow C,
+  unit_iso := arrow.ident_iso_to_walking_to_arrow C,
+  counit_iso := walking_arrow_functor.to_arrow_to_walking_iso_ident C,
+  functor_unit_iso_comp' := by {
+    rintro ⟨l, r, f⟩, ext j, cases j; exact category.comp_id _, 
+  }
 }.
 
 instance arrow_has_finite_limits {C : Type*} [category C] [limits.has_finite_limits C]
   : limits.has_finite_limits (arrow C) :=
   ⟨λ J i1 i2,  @adjunction.has_limits_of_shape_of_equivalence (walking_arrow ⥤ C) _ (arrow C) _ J i1
-                                                              (category_theory.iso_to_equiv (arrow_category_iso_functor_category C)).functor
+                                                              (arrow_category_equiv_functor_category C).functor
                                                               _
                                                               (@limits.has_finite_limits.out _ _ limits.functor_category_has_finite_limits J i1 i2)⟩.
 
@@ -150,14 +258,14 @@ category_theory.comma.category_theory.preadditive.
 instance arrow_iso_functor_preserves_zero {V : Type*} [category V] [preadditive V]
   : @functor.preserves_zero_morphisms (arrow V) _ (walking_arrow ⥤ V) _
                                       (@preadditive.preadditive_has_zero_morphisms _ _ arrow_preadditive) _
-                                      (arrow_category_iso_functor_category V).hom :=
+                                      (arrow_category_equiv_functor_category V).functor :=
   ⟨by { intros f g, ext i, cases i; refl }⟩
 
 noncomputable
 instance arr_ab {V : Type*} [category V] [abelian V] : abelian (arrow V) := 
   @abelian_of_equivalence _ _ arrow_preadditive _ 
                           (walking_arrow ⥤ V) _ _ 
-                          (category_theory.iso_to_equiv (arrow_category_iso_functor_category V)).functor
+                          (arrow_category_equiv_functor_category V).functor
                           arrow_iso_functor_preserves_zero _.
 
 universes v' v u'' u' u
@@ -190,7 +298,7 @@ def preserves_colim_into_arrow_category {C : Type u} [category.{(max u'' v)} C]
                                                    (whisker_left K arrow.left_to_right) hc1 c2)))
   : preserves_colimit K F :=
 begin
-  let e := category_theory.iso_to_equiv (arrow_category_iso_functor_category C),
+  let e := arrow_category_equiv_functor_category C,
   refine category_theory.limits.preserves_colimits_of_equiv_domain _ e _,
   constructor, intros c hc,
   let h := λ k,
@@ -217,10 +325,10 @@ begin
     refine eq.trans _ ((c.ι.app j).naturality arr),
     refl },
   congr,
-  { dsimp [e, category_theory.iso_to_equiv, arrow_category_iso_functor_category],
+  { dsimp [e, arrow_category_equiv_functor_category, walking_arrow_functor.to_arrow],
     congr,
     apply this },
-  { dsimp [e, category_theory.iso_to_equiv, arrow_category_iso_functor_category,
+  { dsimp [e, arrow_category_equiv_functor_category, walking_arrow_functor.to_arrow,
            functor.associator, category_struct.comp, nat_trans.vcomp],
     congr,
     { apply this },
