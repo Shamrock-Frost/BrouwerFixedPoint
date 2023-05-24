@@ -39,58 +39,49 @@ theorem is_iso.cancel_iso_inv_left {C : Type*} [category C] {X Y Z : C}
   (f : Y ⟶ X) [is_iso f] : ∀ (g g' : Y ⟶ Z), inv f ≫ g = inv f ≫ g' ↔ g = g' :=
   iso.cancel_iso_inv_left (as_iso f)
 
-lemma parallel_pair_comp 
+def parallel_pair_comp
   {C : Type*} {D : Type*} [category C] [category D] (F : C ⥤ D) {X Y : C} (f g : X ⟶ Y)
-  : parallel_pair f g ⋙ F = parallel_pair (F.map f) (F.map g) :=
-begin
-  apply category_theory.functor.hext,
-  { intro u, cases u; refl },
-  { intros u v i, cases u; cases v; cases i, 
-    all_goals { simp },
-    all_goals { refl } },
-end
-
-def parallel_pair_comp.cocone_comp_to_cocone_pair
-  {C : Type*} {D : Type*} [category C] [category D] (F : C ⥤ D) {X Y : C} (f g : X ⟶ Y)
-  (c : cocone (parallel_pair f g ⋙ F)) : cocone (parallel_pair (F.map f) (F.map g)) := {
-    X := c.X,
-    ι := eq_to_hom (parallel_pair_comp F f g).symm ≫ c.ι
+  : parallel_pair f g ⋙ F ≅ parallel_pair (F.map f) (F.map g) := {
+    hom := {
+      app := λ i, walking_parallel_pair.rec_on i (𝟙 (F.obj X)) (𝟙 (F.obj Y)),
+      naturality' := by {
+        intros i j f, cases f; dsimp;
+        simp only [category.comp_id, category.id_comp,
+                   eq_self_iff_true, functor.map_id] } },
+    inv := {
+      app := λ i, walking_parallel_pair.rec_on i (𝟙 (F.obj X)) (𝟙 (F.obj Y)),
+      naturality' := by {
+        intros i j f, cases f; dsimp;
+        simp only [category.comp_id, category.id_comp,
+                   eq_self_iff_true, functor.map_id] } },
+    hom_inv_id' := by { ext j, cases j; apply category.id_comp },
+    inv_hom_id' := by { ext j, cases j; apply category.id_comp }
   }
 
-def parallel_pair_comp.cocone_pair_to_cocone_comp
-  {C : Type*} {D : Type*} [category C] [category D] (F : C ⥤ D) {X Y : C} (f g : X ⟶ Y)
-  (c : cocone (parallel_pair (F.map f) (F.map g))) : cocone (parallel_pair f g ⋙ F) := {
-    X := c.X,
-    ι := eq_to_hom (parallel_pair_comp F f g) ≫ c.ι
+def limits.types.quotient_cocone {X : Type*} (s : setoid X) 
+  : @cofork _ _ (subtype s.rel.uncurry) X
+            (_root_.prod.fst ∘ subtype.val) (_root_.prod.snd ∘ subtype.val) :=
+  cofork.of_π (@quotient.mk X s) 
+              (by { ext x, rcases x with ⟨⟨a, b⟩, h⟩, exact quotient.sound h })
+
+def limits.types.quotient_cocone_is_colimit {X : Type*} (s : setoid X) 
+  : is_colimit (limits.types.quotient_cocone s) := {
+    desc := λ c, quot.lift (cofork.π c) (λ (a b : X) (h : s.rel a b), by {
+      have := congr_fun (cofork.condition c) ⟨(a, b), h⟩, exact this,
+    }),
+    fac' := λ c j, by {
+      cases j,
+      { ext a,
+        simp only [cofork.condition, cofork.app_zero_eq_comp_π_left],
+        refl },
+      { ext, refl } },
+    uniq' := by {
+      intros, ext ⟨x⟩, 
+      specialize w walking_parallel_pair.one,
+      dsimp at ⊢ w,
+      exact congr_fun w x
+    }
   }
-
-def parallel_pair_comp.is_colimit_comp_to_is_colimit_pair
-  {C : Type*} {D : Type*} [category C] [category D] (F : C ⥤ D) {X Y : C} (f g : X ⟶ Y)
-  (c : cocone (parallel_pair f g ⋙ F)) (hc : is_colimit c)
-  : is_colimit (parallel_pair_comp.cocone_comp_to_cocone_pair F f g c) := {
-    desc := λ s, hc.desc (parallel_pair_comp.cocone_pair_to_cocone_comp F f g s),
-    fac' := by { intros, refine eq.trans (category.assoc _ _ _) _, rw hc.fac',
-                 refine eq.trans (category.assoc _ _ _).symm _, simp },
-    uniq' := λ s m h, hc.uniq' (parallel_pair_comp.cocone_pair_to_cocone_comp F f g s) m
-                               (λ u, by { refine eq.trans _ (congr_arg (λ w, nat_trans.app (eq_to_hom (parallel_pair_comp F f g)) u ≫ w) (h u)),
-                                          refine eq.trans _ (category.assoc _ _ _),
-                                          refine congr_arg (λ w, w ≫ m) _,
-                                          refine eq.trans _ (category.assoc _ _ _),
-                                          simp }) }
-
-def parallel_pair_comp.is_colimit_pair_to_is_colimit_comp
-  {C : Type*} {D : Type*} [category C] [category D] (F : C ⥤ D) {X Y : C} (f g : X ⟶ Y)
-  (c : cocone (parallel_pair (F.map f) (F.map g))) (hc : is_colimit c)
-  : is_colimit (parallel_pair_comp.cocone_pair_to_cocone_comp F f g c) := {
-    desc := λ s, hc.desc (parallel_pair_comp.cocone_comp_to_cocone_pair F f g s),
-    fac' := by { intros, refine eq.trans (category.assoc _ _ _) _, rw hc.fac',
-                 refine eq.trans (category.assoc _ _ _).symm _, simp },
-    uniq' := λ s m h, hc.uniq' (parallel_pair_comp.cocone_comp_to_cocone_pair F f g s) m
-                               (λ u, by { refine eq.trans _ (congr_arg (λ w, nat_trans.app (eq_to_hom (parallel_pair_comp F f g).symm) u ≫ w) (h u)),
-                                          refine eq.trans _ (category.assoc _ _ _),
-                                          refine congr_arg (λ w, w ≫ m) _,
-                                          refine eq.trans _ (category.assoc _ _ _),
-                                          simp }) }
 
 lemma concrete_category.pow_eq_iter {C : Type*} [category C] [concrete_category C] {X : C} (f : X ⟶ X)
   (k : ℕ) : @coe_fn _ _ concrete_category.has_coe_to_fun (f ^ k : End X) = (f^[k]) :=
