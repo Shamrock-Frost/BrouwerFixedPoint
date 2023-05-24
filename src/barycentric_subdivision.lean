@@ -921,17 +921,17 @@ begin
   dsimp [bounded_diam_submodule, subset_submodule, affine_submodule,
          bounded_by_submodule, spanned_by_sat] at hC,
   rw [← submodule.mem_inf, ← submodule.mem_inf] at hC,
-  rw [submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of D))] at hC,
+  rw [submodule.inf_spans_free ((singular_chain_complex_basis R n).get_basis (Top.of D))] at hC,
   rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R n).get_basis (Top.of D))
                                         hnontriv)] at hC,
-  rw [submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of D))] at hC,
+  rw [submodule.inf_spans_free ((singular_chain_complex_basis R n).get_basis (Top.of D))] at hC,
   rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R n).get_basis (Top.of D))
                                         hnontriv)] at hC,
   dsimp [bounded_diam_submodule, bounded_by_submodule, affine_submodule, spanned_by_sat], 
   rw ← submodule.mem_inf,
-  rw [submodule.inf_spans_free R ((singular_chain_complex_basis R (n+1)).get_basis (Top.of D))],
+  rw [submodule.inf_spans_free ((singular_chain_complex_basis R (n+1)).get_basis (Top.of D))],
   rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R (n+1)).get_basis (Top.of D))
                                         hnontriv)],
@@ -1089,7 +1089,7 @@ begin
       exact eq.trans (one_smul _ _).symm (eq.trans (congr_arg2 _ htrivial rfl) (zero_smul _ _)) },
     have hnontriv : nontrivial R := ⟨⟨1, 0, htrivial⟩⟩,
     dsimp [bounded_diam_submodule, bounded_by_submodule, affine_submodule, spanned_by_sat],
-    rw [submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of D))],
+    rw [submodule.inf_spans_free ((singular_chain_complex_basis R n).get_basis (Top.of D))],
     rw [set.image_inter (@basis.injective _ R _ _ _ _
                                           ((singular_chain_complex_basis R n).get_basis (Top.of D))
                                           hnontriv)],
@@ -2219,8 +2219,8 @@ begin
         refine eq.trans _ (congr_arg2 _ (range_of_singular_chain_complex_include_subspace R _ _ _ n).symm
                                         (range_of_singular_chain_complex_include_subspace R _ _ _ n).symm),
         delta subset_submodule bounded_by_submodule spanned_by_sat,
-        rw submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of X))
-                                      _ _ (set.image_subset_range _ _) (set.image_subset_range _ _),
+        rw submodule.inf_spans_free ((singular_chain_complex_basis R n).get_basis (Top.of X))
+                                      (set.image_subset_range _ _) (set.image_subset_range _ _),
         rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R n).get_basis (Top.of X))
                                         hnontriv)],
