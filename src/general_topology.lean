@@ -113,16 +113,28 @@ begin
   intro x, exact classical.some_spec (hg (set.mem_range_self x))
 end
 
-noncomputable
-def embedding_restricts_to_homeomorph {X Y : Type*} [topological_space X] [topological_space Y]
-  (s : set X) (f : X → Y) (hf : embedding f) : s ≃ₜ f '' s := 
+noncomputable def embedding_restricts_to_homeomorph {X Y : Type*} [topological_space X]
+  [topological_space Y] (s : set X) (f : X → Y) (hf : embedding f) : s ≃ₜ f '' s :=
 (homeomorph.of_embedding _ (hf.comp embedding_subtype_coe)).trans $ homeomorph.set_congr $
   (set.image_eq_range _ _).symm
 
--- lemma embedding_restricts_to_homeomorph_spec
---   {X Y : Type*} [topological_space X] [topological_space Y]
---   (s : set X) (f : X → Y) (hf : embedding f) (x : s)
---   : embedding_restricts_to_homeomorph s f hf x = ⟨f x.val, set.mem_image_of_mem f x.property⟩ :=
--- begin
---   refl
--- end
+/-- A continuous map from a connected space to a `Σ`-type can be lifted to one of the
+components `π i`. -/
+theorem continuous.exists_lift_sigma {X ι : Type*} {π : ι → Type*} [topological_space X]
+  [connected_space X] [∀ i, topological_space (π i)] {f : X → Σ i, π i} (hf : continuous f) :
+  ∃ (i : ι) (g : X → π i), continuous g ∧ f = sigma.mk i ∘ g :=
+begin
+  rcases sigma.is_connected_iff.1 (is_connected_range hf) with ⟨i, s, -, hs⟩,
+  choose g hgs hgf using set.range_subset_iff.1 hs.subset,
+  obtain rfl : f = sigma.mk i ∘ g := (funext hgf).symm,
+  refine ⟨i, g, _, rfl⟩,
+  rwa [← embedding_sigma_mk.continuous_iff] at hf
+end
+
+/-- A continuous map from a connected space to a `Σ`-type can be lifted to one of the
+components `π i`. -/
+theorem continuous_map.exists_lift_sigma {X ι : Type*} {π : ι → Type*} [topological_space X]
+  [connected_space X] [∀ i, topological_space (π i)] {f : C(X, Σ i, π i)} :
+  ∃ (i : ι) (g : C(X, π i)), f = continuous_map.comp ⟨sigma.mk i⟩ g :=
+let ⟨i, g, hgc, hfg⟩ := f.continuous.exists_lift_sigma in
+⟨i, ⟨g, hgc⟩, fun_like.ext' hfg⟩
