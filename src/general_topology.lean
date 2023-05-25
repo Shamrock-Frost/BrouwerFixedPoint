@@ -2,7 +2,7 @@ import topology.constructions
 import topology.separation
 import topology.category.Top.basic
 import topology.homotopy.basic
-import analysis.convex.basic
+import analysis.convex.topology
 
 lemma quotient_map_of_is_closed_map {α β} [topological_space α] [topological_space β] 
   (f : α → β) : function.surjective f → is_closed_map f → continuous f → quotient_map f :=
@@ -56,7 +56,6 @@ begin
 end
 
 universe u
-
 def cylinder : Top.{u} ⥤ Top.{u} := {
   obj := λ X, Top.of (unit_interval × X),
   map := λ X Y f, (continuous_map.id _).prod_map f,
@@ -117,13 +116,8 @@ end
 noncomputable
 def embedding_restricts_to_homeomorph {X Y : Type*} [topological_space X] [topological_space Y]
   (s : set X) (f : X → Y) (hf : embedding f) : s ≃ₜ f '' s := 
-begin
-  refine homeomorph.trans (homeomorph.of_embedding _ (embedding.comp hf (@embedding_subtype_coe _ _ s)))
-         ⟨equiv.set_congr _, _, _⟩,
-  { rw [set.range_comp, subtype.range_coe] },
-  { exact continuous.subtype_mk continuous_subtype_coe _ },
-  { exact continuous.subtype_mk continuous_subtype_coe _ }
-end
+(homeomorph.of_embedding _ (hf.comp embedding_subtype_coe)).trans $ homeomorph.set_congr $
+  (set.image_eq_range _ _).symm
 
 -- lemma embedding_restricts_to_homeomorph_spec
 --   {X Y : Type*} [topological_space X] [topological_space Y]

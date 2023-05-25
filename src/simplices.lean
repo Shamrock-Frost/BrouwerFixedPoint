@@ -3,6 +3,7 @@ import algebraic_topology.simplicial_object
 import analysis.convex.topology
 import algebraic_topology.simplicial_set
 import category_theory.natural_isomorphism
+import topology.category.Top.limits.products
 import .category_theory .general_topology
 
 local attribute [instance]
@@ -56,8 +57,8 @@ lemma coe_to_Top'_map {x y : simplex_category} (f : x ⟶ y) (g : x.to_Top'_obj)
 @[continuity]
 lemma continuous_to_Top'_map {x y : simplex_category} (f : x ⟶ y) :
   continuous (to_Top'_map f) :=
-continuous_subtype_mk _ $ continuous_pi $ λ i, continuous_finset_sum _ $
-  λ j hj, continuous.comp (continuous_apply _) continuous_subtype_val
+continuous.subtype_mk (continuous_pi $ λ i, continuous_finset_sum _ $
+  λ j hj, continuous.comp (continuous_apply _) continuous_subtype_val) _
 
 @[simps]
 def to_Top' : simplex_category ⥤ Top :=
@@ -143,6 +144,16 @@ begin
   rw [heq_iff_eq, heq_iff_eq], apply e,
 end
 
+/-
+β = Σ j, (f j).α
+
+x : C ↦ C(F.obj x, β)
+y : Cᵒᵖ ⥤ Type
+
+z : 
+-/
+
+
 universes u u'
 def connected_functor_preserves_coprod {C : Type (max u u')} [small_category C]
   (F : C ⥤ Top.{max u u'}) {J : Type u'} (f : J → Top.{max u u'})
@@ -161,13 +172,14 @@ begin
   have : ∀ g : F.obj x.unop ⟶ Top.of (Σ (i : J), f i), ∃! j : J,
              set.range g ⊆ set.range (Top.sigma_ι.{(max u u') u'} f j),
   { intro g,
-    obtain ⟨hx, ⟨b⟩⟩ := hF x.unop,
+    clear α,
+    obtain ⟨⟨b⟩⟩ := hF x.unop,
     have : ∀ {j : J}, g b ∈ set.range (Top.sigma_ι.{(max u u') u'} f j)
                     ↔ set.range g ⊆ set.range (Top.sigma_ι.{(max u u') u'} f j),
     { intro j, refine ⟨_, λ h, h (set.mem_range_self b)⟩,
       intro h,
       exact is_preconnected.subset_clopen (is_preconnected_range g.continuous_to_fun) 
-                                          ⟨is_open_range_sigma_mk, is_closed_sigma_mk⟩
+                                          ⟨is_open_range_sigma_mk, is_closed_range_sigma_mk⟩
                                           ⟨g b, set.mem_range_self b, h⟩ },
     refine ⟨(g b).fst, this.mp ⟨(g b).snd, (g b).eta⟩, _⟩,
     intros j hj,
@@ -254,7 +266,10 @@ instance Top.to_sSet'_preserves_coprod {J : Type} (f : J → Top)
   : limits.preserves_colimit (discrete.functor f) Top.to_sSet' :=
 begin 
   apply connected_functor_preserves_coprod,
-  intro x, 
+  intro x,
+  -- todo: why do we need this?
+  haveI : has_continuous_smul ℝ (fin (x.len + 1) → ℝ) := @pi.has_continuous_smul _ _ _ _ _ _
+    (λ _, infer_instance),
   refine (subtype.connected_space ((convex_std_simplex ℝ (fin (x.len + 1))).is_connected _)),
   rw ← set.nonempty_coe_sort, constructor,
   exact vertex x.len 0, 

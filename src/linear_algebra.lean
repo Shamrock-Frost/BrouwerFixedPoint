@@ -69,7 +69,7 @@ lemma basis.mem_span_iff {R : Type u} [semiring R] {M : Type v}
 show x ∈ submodule.span R S ↔ (∀ i, b.repr x i ≠ 0 → i ∈ b ⁻¹' S),
 by rw [← b.mem_span_image_iff, set.image_preimage_eq_of_subset hS]
 
-lemma submodule.inf_spans_free (R : Type) [semiring R] {M : Type*}
+lemma submodule.inf_spans_free {R : Type*} [semiring R] {M : Type*}
   [add_comm_monoid M] [module R M] {ι : Type*}
   (b : basis ι R M)
   {S T : set M} (hS : S ⊆ set.range b) (hT : T ⊆ set.range b) :

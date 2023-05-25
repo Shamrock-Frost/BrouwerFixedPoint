@@ -1,10 +1,9 @@
 [package]
 name = "BrouwerFixedPoint"
 version = "0.1"
-lean_version = "leanprover-community/lean:3.48.0"
+lean_version = "leanprover-community/lean:3.51.0"
 path = "src"
 
 [dependencies]
-mathlib = {git = "https://github.com/leanprover-community/mathlib", rev = "bb5be046761c9e9c180d7129e656ff49ef34606c"}
+mathlib = {git = "https://github.com/leanprover-community/mathlib", rev = "5bfbcca0a7ffdd21cf1682e59106d6c942434a32"}
 lean-liquid = {git = "https://github.com/leanprover-community/lean-liquid", rev = "92f188bd17f34dbfefc92a83069577f708851aec"}
-

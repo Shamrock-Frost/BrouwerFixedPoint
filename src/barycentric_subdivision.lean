@@ -7,6 +7,8 @@ local attribute [instance]
   category_theory.concrete_category.has_coe_to_sort
   category_theory.concrete_category.has_coe_to_fun
 
+open_locale nnreal big_operators
+
 section subcomplexes_with_indexing
 
 -- weird universe issues without being explicit :(
@@ -285,21 +287,21 @@ end
 
 noncomputable
 def bounded_diam_submodule (R : Type*) [comm_ring R] (X : Type*) [pseudo_metric_space X]
-  (ε : nnreal) (n : ℕ)
+  (ε : ℝ≥0) (n : ℕ)
   : submodule R (((singular_chain_complex R).obj (Top.of X)).X n) :=
   bounded_by_submodule R { S : set (Top.of X) | @metric.bounded X _ S ∧ @metric.diam X _ S ≤ ε } n
 
 noncomputable
 def bounded_diam_subcomplex (R : Type*) [comm_ring R] (X : Type*) [pseudo_metric_space X]
-  (ε : nnreal) : chain_complex (Module R) ℕ :=
+  (ε : ℝ≥0) : chain_complex (Module R) ℕ :=
   bounded_by_subcomplex R { S : set (Top.of X) | @metric.bounded X _ S ∧ @metric.diam X _ S ≤ ε }
 
 lemma bounded_diam_submodule_eq_bounded_diam_submodule (R : Type*) [comm_ring R] {X : Type}
-  [pseudo_metric_space X] (ε : nnreal) (n : ℕ)
+  [pseudo_metric_space X] (ε : ℝ≥0) (n : ℕ)
   : (bounded_diam_subcomplex R X ε).X n = Module.of R (bounded_diam_submodule R X ε n) := rfl
 
 lemma bounded_diam_submodule_monotone (R : Type) [comm_ring R] {X : Type*} [pseudo_metric_space X] 
-  (ε δ : nnreal) (h : ε ≤ δ) (n : ℕ)
+  (ε δ : ℝ≥0) (h : ε ≤ δ) (n : ℕ)
   : bounded_diam_submodule R X ε n ≤ bounded_diam_submodule R X δ n :=
 begin
   dsimp [bounded_diam_submodule],
@@ -384,7 +386,7 @@ end
 lemma metric.lebesgue_number_lemma {M : Type*} [pseudo_metric_space M] (hCompact : compact_space M)
   (cov : set (set M)) (cov_open : ∀ s, s ∈ cov → is_open s) (hcov : ⋃₀ cov = ⊤)
   (cov_nonempty : cov.nonempty) -- if M is empty this can happen!
-  : ∃ δ : nnreal, 0 < δ ∧ (∀ S : set M, metric.diam S < δ → ∃ U, U ∈ cov ∧ S ⊆ U) :=
+  : ∃ δ : ℝ≥0, 0 < δ ∧ (∀ S : set M, metric.diam S < δ → ∃ U, U ∈ cov ∧ S ⊆ U) :=
   match lebesgue_number_lemma_sUnion (is_compact_univ_iff.mpr hCompact) cov_open (set.univ_subset_iff.mpr hcov) with
   | ⟨n, H, hn⟩ := match metric.mem_uniformity_dist.mp H with 
                  | ⟨ε, ε_pos, hε⟩ := ⟨ε.to_nnreal, real.to_nnreal_pos.mpr ε_pos, λ S hS, 
@@ -408,7 +410,7 @@ parameters {D : set (ι → ℝ)} (hConvex : convex ℝ D)
 
 def convex_combination {ι' : Type} [fintype ι'] [nonempty ι']
   (vertices : ι' → D) (coeffs : std_simplex ℝ ι') : D :=
-  ⟨finset.univ.sum (λ i, coeffs.val i • (vertices i).val), 
+  ⟨∑ i, coeffs.val i • (vertices i).val,
    convex.sum_mem hConvex (λ i _, coeffs.property.left i) coeffs.property.right
                           (λ i _, (vertices i).property)⟩
 
@@ -919,17 +921,17 @@ begin
   dsimp [bounded_diam_submodule, subset_submodule, affine_submodule,
          bounded_by_submodule, spanned_by_sat] at hC,
   rw [← submodule.mem_inf, ← submodule.mem_inf] at hC,
-  rw [submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of D))] at hC,
+  rw [submodule.inf_spans_free ((singular_chain_complex_basis R n).get_basis (Top.of D))] at hC,
   rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R n).get_basis (Top.of D))
                                         hnontriv)] at hC,
-  rw [submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of D))] at hC,
+  rw [submodule.inf_spans_free ((singular_chain_complex_basis R n).get_basis (Top.of D))] at hC,
   rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R n).get_basis (Top.of D))
                                         hnontriv)] at hC,
   dsimp [bounded_diam_submodule, bounded_by_submodule, affine_submodule, spanned_by_sat], 
   rw ← submodule.mem_inf,
-  rw [submodule.inf_spans_free R ((singular_chain_complex_basis R (n+1)).get_basis (Top.of D))],
+  rw [submodule.inf_spans_free ((singular_chain_complex_basis R (n+1)).get_basis (Top.of D))],
   rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R (n+1)).get_basis (Top.of D))
                                         hnontriv)],
@@ -1087,7 +1089,7 @@ begin
       exact eq.trans (one_smul _ _).symm (eq.trans (congr_arg2 _ htrivial rfl) (zero_smul _ _)) },
     have hnontriv : nontrivial R := ⟨⟨1, 0, htrivial⟩⟩,
     dsimp [bounded_diam_submodule, bounded_by_submodule, affine_submodule, spanned_by_sat],
-    rw [submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of D))],
+    rw [submodule.inf_spans_free ((singular_chain_complex_basis R n).get_basis (Top.of D))],
     rw [set.image_inter (@basis.injective _ R _ _ _ _
                                           ((singular_chain_complex_basis R n).get_basis (Top.of D))
                                           hnontriv)],
@@ -2106,7 +2108,7 @@ lemma bounded_by_sup {X : Type*} [topological_space X]
   = bounded_by_submodule R (cov ∪ cov') n :=
 begin
   delta bounded_by_submodule spanned_by_sat,
-  rw submodule.sup_spans R,
+  rw [← submodule.span_union],
   congr,
   simp,
   rw ← set.image_union,
@@ -2217,8 +2219,8 @@ begin
         refine eq.trans _ (congr_arg2 _ (range_of_singular_chain_complex_include_subspace R _ _ _ n).symm
                                         (range_of_singular_chain_complex_include_subspace R _ _ _ n).symm),
         delta subset_submodule bounded_by_submodule spanned_by_sat,
-        rw submodule.inf_spans_free R ((singular_chain_complex_basis R n).get_basis (Top.of X))
-                                      _ _ (set.image_subset_range _ _) (set.image_subset_range _ _),
+        rw submodule.inf_spans_free ((singular_chain_complex_basis R n).get_basis (Top.of X))
+                                      (set.image_subset_range _ _) (set.image_subset_range _ _),
         rw [set.image_inter (@basis.injective _ R _ _ _ _
                                         ((singular_chain_complex_basis R n).get_basis (Top.of X))
                                         hnontriv)],
