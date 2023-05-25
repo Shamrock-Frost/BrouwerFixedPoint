@@ -130,9 +130,9 @@ lemma basis_constr_of_lin_indep_family_injective {ι : Type*} {R : Type*} {M : T
 begin
   rw [← linear_map.ker_eq_bot, linear_map.ker_eq_bot'],
   intros m hm,
-  simp [basis.constr] at hm,
-  rw finsupp.total_map_domain at hm, swap, { exact hf.injective },
-  rw function.comp.left_id at hm,
+  simp only [basis.constr, linear_equiv.coe_mk, linear_map.coe_comp,
+             linear_equiv.coe_coe, function.comp_app, finsupp.lmap_domain_apply,
+             finsupp.total_map_domain, function.comp.left_id] at hm,
   rw linear_independent_iff at hf,
   specialize hf _ hm,
   rw linear_equiv.map_eq_zero_iff at hf, exact hf
