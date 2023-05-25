@@ -116,9 +116,8 @@ end
 noncomputable
 def embedding_restricts_to_homeomorph {X Y : Type*} [topological_space X] [topological_space Y]
   (s : set X) (f : X → Y) (hf : embedding f) : s ≃ₜ f '' s := 
-(equiv.set.image f s hf.inj).to_homeomorph_of_inducing $
-  inducing_of_inducing_compose (hf.continuous.subtype_map $ set.maps_to_image _ _)
-    continuous_subtype_coe (hf.to_inducing.comp inducing_coe)
+(homeomorph.of_embedding _ (hf.comp embedding_subtype_coe)).trans $ homeomorph.set_congr $
+  (set.image_eq_range _ _).symm
 
 -- lemma embedding_restricts_to_homeomorph_spec
 --   {X Y : Type*} [topological_space X] [topological_space Y]
