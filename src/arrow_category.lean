@@ -1,6 +1,6 @@
 import category_theory.arrow category_theory.category.Cat category_theory.abelian.transfer
 import category_theory.limits.shapes.functor_category category_theory.limits.preserves.shapes.zero
-import category_theory.abelian.functor_category
+import category_theory.abelian.functor_category category_theory.preadditive.additive_functor
 import algebra.homology.homology
 import .category_theory
 
@@ -46,9 +46,11 @@ def walking_arrow.morphism_to_functor {C : Type*} [category C] {x y : C} (f : x 
   : walking_arrow ⥤ C := {
     obj := walking_arrow.morphism_to_functor_obj f,
     map := λ _ _, walking_arrow.morphism_to_functor_map f,
-    map_comp' := by { intros X Y Z f g, cases f; cases g; symmetry;
-                      dsimp [walking_arrow.comp, walking_arrow.morphism_to_functor_map];
-                      try { exact category.id_comp' _ }; try { exact category.comp_id' _ }, }
+    map_comp' := by {
+      intros X Y Z f g, cases f; cases g; symmetry;
+      dsimp only [walking_arrow.morphism_to_functor_map];
+      try { exact category.id_comp' _ }; try { exact category.comp_id' _ }
+    }
   }
 
 def walking_arrow.commutative_square_to_nat_trans_app {C : Type*} [category C] {x y x' y' : C}
@@ -65,10 +67,13 @@ def arrow.to_walking_arrow_functor (C : Type*) [category C]
     obj := λ f, walking_arrow.morphism_to_functor f.hom,
     map := λ f g w, {
       app := walking_arrow.commutative_square_to_nat_trans_app f.hom g.hom _ _ w.w,
-      naturality' := by { intros i j a, cases a,
-                          { delta walking_arrow.morphism_to_functor, unfold_projs,
-                            simp [walking_arrow.morphism_to_functor_map] },
-                          { symmetry, exact w.w } }
+      naturality' := by {
+        intros i j a, cases a,
+        { delta walking_arrow.morphism_to_functor, unfold_projs,
+          simp only [walking_arrow.morphism_to_functor_map,
+                     category.id_comp, category.comp_id] },
+        { symmetry, exact w.w }
+      }
     },
     map_id' := by { intro X, ext i, cases i; refl },
     map_comp' := by { intros X Y Z f g, ext i, cases i; refl }
@@ -88,13 +93,13 @@ def arrow.ident_iso_to_walking_to_arrow (C : Type*) [category C]
         rintros ⟨l, r, f⟩ ⟨l', r', g⟩ ⟨ϕ, ψ, w⟩,
         ext,
         { rw [functor.id_map, comma.comp_left, functor.comp_map],
-          dsimp [arrow.ident_iso_to_walking_to_arrow._match_1],
+          dsimp only [arrow.ident_iso_to_walking_to_arrow._match_1],
           refine eq.trans (congr_arg2 _ rfl comma.id_left) _,
           rw [category.comp_id],
           refine eq.trans (category.id_comp _).symm _,
           exact congr_arg2 _ (eq.symm comma.id_left) rfl },
         { rw [functor.id_map, comma.comp_right, functor.comp_map],
-          dsimp [arrow.ident_iso_to_walking_to_arrow._match_1],
+          dsimp only [arrow.ident_iso_to_walking_to_arrow._match_1],
           refine eq.trans (congr_arg2 _ rfl comma.id_right) _,
           rw [category.comp_id],
           refine eq.trans (category.id_comp _).symm _,
@@ -107,13 +112,13 @@ def arrow.ident_iso_to_walking_to_arrow (C : Type*) [category C]
         rintros ⟨l, r, f⟩ ⟨l', r', g⟩ ⟨ϕ, ψ, w⟩,
         ext,
         { rw [functor.id_map, comma.comp_left, functor.comp_map],
-          dsimp [arrow.ident_iso_to_walking_to_arrow._match_2],
+          dsimp only [arrow.ident_iso_to_walking_to_arrow._match_2],
           refine eq.trans (congr_arg2 _ rfl comma.id_left) _,
           rw [category.comp_id],
           refine eq.trans (category.id_comp _).symm _,
           exact congr_arg2 _ (eq.symm comma.id_left) rfl },
         { rw [functor.id_map, comma.comp_right, functor.comp_map],
-          dsimp [arrow.ident_iso_to_walking_to_arrow._match_2],
+          dsimp only [arrow.ident_iso_to_walking_to_arrow._match_2],
           refine eq.trans (congr_arg2 _ rfl comma.id_right) _,
           rw [category.comp_id],
           refine eq.trans (category.id_comp _).symm _,
@@ -216,9 +221,14 @@ instance {A : Type*} [category A] [preadditive A] {B : Type*} [category B] [prea
          {T : Type*} [category T] [preadditive T]
          {L : A ⥤ T} [L.additive] {R : B ⥤ T} [R.additive]
          (X Y : comma L R) : add_comm_group (comma_morphism X Y) := {
-    add := λ w v, ⟨w.left + v.left, w.right + v.right, by simp⟩,
-    zero := ⟨0, 0, by simp⟩,
-    neg := λ w, ⟨-w.left, -w.right, by simp⟩,
+    add := λ w v, ⟨w.left + v.left, w.right + v.right, 
+      by simp only [functor.map_add, preadditive.add_comp, comma_morphism.w,
+                    preadditive.comp_add, auto_param_eq]⟩,
+    zero := ⟨0, 0, by simp only [functor.map_zero, auto_param_eq,
+                                limits.comp_zero, limits.zero_comp]⟩,
+    neg := λ w, ⟨-w.left, -w.right,
+      by simp only [functor.map_neg, preadditive.neg_comp, comma_morphism.w,
+                    preadditive.comp_neg, auto_param_eq]⟩,
     add_assoc := by { rintros ⟨wl, wr, hw⟩ ⟨vl, vr, hv⟩ ⟨ul, ur, hu⟩, apply comma_morphism.ext,
                       { exact add_assoc wl vl ul }, { exact add_assoc wr vr ur } },
     zero_add := by { rintro ⟨wl, wr, hw⟩, apply comma_morphism.ext,
@@ -283,8 +293,14 @@ def mk_arrow_cocone {C : Type u} [category.{v} C]
   {c1 : cocone K1} (hc1 : is_colimit c1) (c2 : cocone K2)
   : cocone (mk_arrow_diagram η) := {
     X := hc1.desc ((cocones.precompose η).obj c2),
-    ι := { app := λ j, arrow.hom_mk' (eq.trans (hc1.fac _ j) (congr_fun (congr_arg _ (cocones.precompose_obj_ι η c2)) j)),
-           naturality' := by { intros, ext; dsimp [mk_arrow_diagram]; simp } }
+    ι := {
+      app := λ j, arrow.hom_mk' (eq.trans (hc1.fac _ j) (congr_fun (congr_arg _ (cocones.precompose_obj_ι η c2)) j)),
+      naturality' := by {
+        intros,  ext;
+        dsimp [is_colimit.fac, cocones.precompose_obj_ι, mk_arrow_diagram];
+        simp only [cocone.w, category.comp_id]
+      }
+    }
   }.
 
 noncomputable
@@ -311,8 +327,8 @@ begin
   let hTarget := @limits.is_colimit_of_preserves _ _ _ _ _ _ _ _ _ hc (h walking_arrow.target),
   refine is_colimit.of_iso_colimit _ (functor.map_cocone_comp' (K ⋙ e.functor) e.inverse F c).symm,
   convert H hSource hTarget,
-  dsimp [mk_arrow_cocone, mk_arrow_diagram, functor.map_cocone,
-          cocones.functoriality, cocones.precompose],
+  dsimp only [mk_arrow_cocone, mk_arrow_diagram, functor.map_cocone,
+              cocones.functoriality, cocones.precompose],
   have : ∀ h, c.X.map arr
             = hSource.desc { X := c.X.obj target,
                              ι := @whisker_left J _ (arrow C) _ C _ K _ _ arrow.left_to_right
@@ -321,15 +337,18 @@ begin
   { intro h, refine hSource.hom_ext _, intro j,
     rw hSource.fac,
     symmetry,
-    simp,
+    simp only [nat_trans.comp_app, whisker_left_app, arrow.left_to_right_app,
+               functor.map_cocone_ι_app, evaluation_obj_map],
     refine eq.trans _ ((c.ι.app j).naturality arr),
     refl },
   congr,
-  { dsimp [e, arrow_category_equiv_functor_category, walking_arrow_functor.to_arrow],
+  { dsimp only [e, arrow_category_equiv_functor_category,
+                walking_arrow_functor.to_arrow],
     congr,
     apply this },
-  { dsimp [e, arrow_category_equiv_functor_category, walking_arrow_functor.to_arrow,
-           functor.associator, category_struct.comp, nat_trans.vcomp],
+  { dsimp only [e, arrow_category_equiv_functor_category, nat_trans.vcomp, 
+                walking_arrow_functor.to_arrow, functor.associator,
+                category_struct.comp, nat_trans.naturality],
     congr,
     { apply this },
     { ext, refl, intros j j' h, cases h, rw category.id_comp _, congr,

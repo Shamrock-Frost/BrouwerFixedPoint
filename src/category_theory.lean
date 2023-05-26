@@ -274,30 +274,4 @@ lemma colimit_iso_colimit_cocone_desc {J C : Type*} [category J] [category C]
   : (colimit.iso_colimit_cocone c).inv ≫ colimit.desc F c' = c.is_colimit.desc c' :=
  by { apply c.is_colimit.hom_ext, intro j, simp }
 
--- universes v₁ v₂ v₃ v₄ u₁ u₂ u₃ u₄ 
--- I think the universe levels are borked :(
--- def comma.cocone_of_preserves_is_colimit'
---   {J : Type u₁} [small_category.{u₁} J] {A : Type u₂}
---   [category.{(max u₁ u₂) u₂} A] {B : Type u₃}
---   [category.{(max u₁ u₃) u₃} B] {T : Type u₄}
---   [category.{(max u₁ u₄) u₄} T] {L : A ⥤ T} {R : B ⥤ T}
---   (F : J ⥤ comma L R)
---   [preserves_colimit (F ⋙ comma.fst L R) L]
---   {c₁ : cocone (F ⋙ comma.fst L R)} (t₁ : is_colimit c₁)
---   {c₂ : cocone (F ⋙ comma.snd L R)} (t₂ : is_colimit c₂) :
---   is_colimit (comma.cocone_of_preserves.{u₁} F t₁ c₂) :=
--- { desc := λ s,
---   { left := t₁.desc ((fst L R).map_cocone s),
---     right := t₂.desc ((snd L R).map_cocone s),
---     w' := (is_colimit_of_preserves L t₁).hom_ext $ λ j,
---     begin
---       rw [cocone_of_preserves_X_hom, (is_colimit_of_preserves L t₁).fac_assoc,
---         colimit_auxiliary_cocone_ι_app, assoc, ←R.map_comp, t₂.fac, L.map_cocone_ι_app,
---         ←L.map_comp_assoc, t₁.fac],
---       exact (s.ι.app j).w,
---     end },
---   uniq' := λ s m w, comma_morphism.ext _ _
---       (t₁.uniq ((fst L R).map_cocone s) _ (by simp [←w]))
---       (t₂.uniq ((snd L R).map_cocone s) _ (by simp [←w])) }
-
 end category_theory
