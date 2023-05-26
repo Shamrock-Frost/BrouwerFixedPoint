@@ -46,13 +46,14 @@ lemma basis.span_image {R : Type u} [semiring R] {M : Type v}
   (b : basis ι R M) (S : set ι) :
   submodule.span R (b '' S) = (finsupp.supported R R S).comap (b.repr : M →ₗ[R] ι →₀ R) :=
 by rw [← b.repr.symm_symm, ← b.repr.symm.map_eq_comap, finsupp.supported_eq_span_single,
-  submodule.map_span, set.image_image]; refl
+       submodule.map_span, set.image_image]; refl
 
 lemma basis.mem_span_image_iff {R : Type u} [semiring R] {M : Type v}
   [add_comm_monoid M] [module R M] {ι : Type w}
   (b : basis ι R M) {S : set ι} {x : M} :
   x ∈ submodule.span R (b '' S) ↔ (∀ i, b.repr x i ≠ 0 → i ∈ S) :=
-by simp [b.span_image, set.subset_def, finsupp.mem_supported].
+by simp only [b.span_image, set.subset_def, finsupp.mem_supported, finset.mem_coe,
+              submodule.mem_comap, linear_equiv.coe_coe, finsupp.mem_support_iff]
 
 lemma basis.span_of_subset_range {R : Type u} [semiring R] {M : Type v}
   [add_comm_monoid M] [module R M] {ι : Type w}
@@ -74,7 +75,7 @@ lemma submodule.inf_spans_free {R : Type*} [semiring R] {M : Type*}
   submodule.span R S ⊓ submodule.span R T = submodule.span R (S ∩ T) :=
 have hST : S ∩ T ⊆ set.range b := (set.inter_subset_left _ _).trans hS,
 by simp only [b.span_of_subset_range, *, ← submodule.comap_inf, set.preimage_inter,
-  finsupp.supported_inter]
+              finsupp.supported_inter]
 
 noncomputable
 def basis.quotient (ι : Type*) (R : Type*) (M : Type*) [ring R] [add_comm_group M]

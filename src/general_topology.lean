@@ -68,14 +68,17 @@ def homeomorph.subtype_pi_homeomorph_pi
   [τ : Π (a : α), topological_space (β a)]
   : { f : Π (a : α), β a // ∀ a, P a (f a) } ≃ₜ (Π (a : α), { b // P a b }) :=
   equiv.subtype_pi_equiv_pi.to_homeomorph_of_inducing
-    ⟨by { simp [subtype.topological_space, Pi.topological_space, induced_compose], refl }⟩
+    ⟨by { simp only [subtype.topological_space, Pi.topological_space,
+                     induced_compose, induced_infi],
+          refl }⟩
 
 def homeomorph.subtype_prod_equiv_prod
   {α : Type*} {β : Type*} {p : α → Prop} {q : β → Prop} 
   [tα : topological_space α] [tβ : topological_space β]
   : {c : α × β // p c.fst ∧ q c.snd} ≃ₜ {a // p a} × {b // q b} :=
   equiv.subtype_prod_equiv_prod.to_homeomorph_of_inducing
-    ⟨by { simp [subtype.topological_space, prod.topological_space, induced_inf, induced_compose],
+    ⟨by { simp only [subtype.topological_space, prod.topological_space,
+                    induced_inf, induced_compose],
           refl }⟩
 
 variables {E : Type*} [add_comm_group E] [module ℝ E] [topological_space E]
@@ -83,11 +86,16 @@ variables {E : Type*} [add_comm_group E] [module ℝ E] [topological_space E]
 
 /-- A non-empty star convex set is a contractible space. -/
 def star_convex.contraction (x : s) (h : star_convex ℝ (x : E)  s) :
-  (continuous_map.id s).homotopy (continuous_map.const s x) :=
-{ to_fun := λ p, ⟨p.1.1 • x + (1 - p.1.1) • p.2,
+  (continuous_map.id s).homotopy (continuous_map.const s x) := {
+  to_fun := λ p, ⟨p.1.1 • x + (1 - p.1.1) • p.2,
                     h p.2.2 p.1.2.1 (sub_nonneg.2 p.1.2.2) (add_sub_cancel'_right _ _)⟩,
-  map_zero_left' := λ _, by simp,
-  map_one_left' := λ _, by simp, }
+  map_zero_left' := λ _, by simp only [subtype.val_eq_coe, set.Icc.coe_zero,
+                                       zero_smul, tsub_zero, subtype.coe_eta,
+                                       continuous_map.id_apply, one_smul, zero_add],
+  map_one_left' := λ _, by simp only [subtype.val_eq_coe, set.Icc.coe_one, one_smul,
+                                      sub_self, zero_smul, add_zero, subtype.coe_eta,
+                                      continuous_map.const_apply]
+}
 
 /-- A non-empty convex set is a contractible space. -/
 def convex.contraction (hs : convex ℝ s) (x0 : s) :
@@ -118,11 +126,3 @@ def embedding_restricts_to_homeomorph {X Y : Type*} [topological_space X] [topol
   (s : set X) (f : X → Y) (hf : embedding f) : s ≃ₜ f '' s := 
 (homeomorph.of_embedding _ (hf.comp embedding_subtype_coe)).trans $ homeomorph.set_congr $
   (set.image_eq_range _ _).symm
-
--- lemma embedding_restricts_to_homeomorph_spec
---   {X Y : Type*} [topological_space X] [topological_space Y]
---   (s : set X) (f : X → Y) (hf : embedding f) (x : s)
---   : embedding_restricts_to_homeomorph s f hf x = ⟨f x.val, set.mem_image_of_mem f x.property⟩ :=
--- begin
---   refl
--- end
