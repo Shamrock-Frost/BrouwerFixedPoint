@@ -121,8 +121,48 @@ begin
   intro x, exact classical.some_spec (hg (set.mem_range_self x))
 end
 
-noncomputable
-def embedding_restricts_to_homeomorph {X Y : Type*} [topological_space X] [topological_space Y]
-  (s : set X) (f : X → Y) (hf : embedding f) : s ≃ₜ f '' s := 
+noncomputable def embedding_restricts_to_homeomorph {X Y : Type*} [topological_space X]
+  [topological_space Y] (s : set X) (f : X → Y) (hf : embedding f) : s ≃ₜ f '' s :=
 (homeomorph.of_embedding _ (hf.comp embedding_subtype_coe)).trans $ homeomorph.set_congr $
   (set.image_eq_range _ _).symm
+
+theorem function.eq_of_sigma_mk_comp {α ι : Type*} {π : ι → Type*} [nonempty α]
+  {i j : ι} {f : α → π i} {g : α → π j} (h : sigma.mk i ∘ f = sigma.mk j ∘ g) :
+  i = j ∧ f == g :=
+begin
+  inhabit α,
+  obtain ⟨rfl, -⟩ : i = j ∧ f default == g default, by simpa only [(∘)] using congr_fun h default,
+  simpa [function.funext_iff] using h
+end
+
+/-- A continuous map from a connected space to a `Σ`-type can be lifted to one of the
+components `π i`. -/
+theorem continuous.exists_lift_sigma {X ι : Type*} {π : ι → Type*} [topological_space X]
+  [connected_space X] [∀ i, topological_space (π i)] {f : X → Σ i, π i} (hf : continuous f) :
+  ∃ (i : ι) (g : X → π i), continuous g ∧ f = sigma.mk i ∘ g :=
+begin
+  rcases sigma.is_connected_iff.1 (is_connected_range hf) with ⟨i, s, -, hs⟩,
+  choose g hgs hgf using set.range_subset_iff.1 hs.subset,
+  obtain rfl : f = sigma.mk i ∘ g := (funext hgf).symm,
+  refine ⟨i, g, _, rfl⟩,
+  rwa [← embedding_sigma_mk.continuous_iff] at hf
+end
+
+/-- A continuous map from a connected space to a `Σ`-type can be lifted to one of the
+components `π i`. -/
+theorem continuous_map.exists_lift_sigma {X ι : Type*} {π : ι → Type*} [topological_space X]
+  [connected_space X] [∀ i, topological_space (π i)] (f : C(X, Σ i, π i)) :
+  ∃ (i : ι) (g : C(X, π i)), f = continuous_map.comp ⟨sigma.mk i⟩ g :=
+let ⟨i, g, hgc, hfg⟩ := f.continuous.exists_lift_sigma in
+⟨i, ⟨g, hgc⟩, fun_like.ext' hfg⟩
+
+noncomputable def equiv.continuous_map_sigma_equiv {X ι : Type*} {π : ι → Type*}
+  [topological_space X] [connected_space X] [∀ i, topological_space (π i)] :
+  C(X, Σ i, π i) ≃ Σ i, C(X, π i) :=
+equiv.symm $ equiv.of_bijective (λ g, continuous_map.comp ⟨sigma.mk g.1⟩ g.2) $
+  begin
+    refine ⟨_, λ f, let ⟨i, g, h⟩ := f.exists_lift_sigma in ⟨⟨i, g⟩, h.symm⟩⟩,
+    rintro ⟨i, g⟩ ⟨j, g'⟩ h,
+    obtain ⟨rfl : i = j, h⟩ := function.eq_of_sigma_mk_comp (fun_like.ext'_iff.1 h),
+    simpa using h
+  end

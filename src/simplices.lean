@@ -3,6 +3,7 @@ import algebraic_topology.simplicial_object
 import analysis.convex.topology
 import algebraic_topology.simplicial_set
 import category_theory.natural_isomorphism
+import topology.category.Top.limits.products
 import .category_theory .general_topology
 
 local attribute [instance]
@@ -173,7 +174,6 @@ y : Cᵒᵖ ⥤ Type
 z : 
 -/
 
-
 universes u u'
 def connected_functor_preserves_coprod {C : Type (max u u')} [small_category C]
   (F : C ⥤ Top.{max u u'}) {J : Type u'} (f : J → Top.{max u u'})
@@ -188,63 +188,21 @@ begin
   refine limits.is_colimit.equiv_of_nat_iso_of_iso α.symm _ _
            (functor.map_cocone_map_cocone' _ _ _ _) _,
   change limits.is_colimit ((coyoneda.obj (F.op.obj x)).map_cocone (Top.sigma_cofan.{(max u u') u'} f)),
-  dsimp only [Top.sigma_cofan, coyoneda, functor.map_cocone,
-              limits.cocones.functoriality],
-  have : ∀ g : F.obj x.unop ⟶ Top.of (Σ (i : J), f i), ∃! j : J,
-             set.range g ⊆ set.range (Top.sigma_ι.{(max u u') u'} f j),
-  { intro g,
-    clear α,
-    obtain ⟨⟨b⟩⟩ := hF x.unop,
-    have : ∀ {j : J}, g b ∈ set.range (Top.sigma_ι.{(max u u') u'} f j)
-                    ↔ set.range g ⊆ set.range (Top.sigma_ι.{(max u u') u'} f j),
-    { intro j, refine ⟨_, λ h, h (set.mem_range_self b)⟩,
-      intro h,
-      exact is_preconnected.subset_clopen (is_preconnected_range g.continuous_to_fun) 
-                                          ⟨is_open_range_sigma_mk, is_closed_range_sigma_mk⟩
-                                          ⟨g b, set.mem_range_self b, h⟩ },
-    refine ⟨(g b).fst, this.mp ⟨(g b).snd, (g b).eta⟩, _⟩,
-    intros j hj,
-    obtain ⟨p, hp⟩ := this.mpr hj,
-    rw ← hp, refl },
-  have h : ∀ g : F.obj x.unop ⟶ Top.of (Σ (i : J), f i),
-               g = embedding.pullback (@embedding_sigma_mk J (λ i, ↥(f i)) _ _) g
-                                      (classical.some_spec (this g)).left
-                   ≫ Top.sigma_ι.{(max u u') u'} f (classical.some (this g)),
-  { intro g, ext p : 1, symmetry,
-    exact embedding.pullback_spec (@embedding_sigma_mk J (λ i, ↥(f i)) _ _) g
-                                      (classical.some_spec (this g)).left _ },
+  dsimp [Top.sigma_cofan, coyoneda, functor.map_cocone, limits.cocones.functoriality],
+  let e : (F.obj x.unop ⟶ Top.of (Σ i, f i)) ≃ Σ i, F.obj x.unop ⟶ f i :=
+    equiv.continuous_map_sigma_equiv,
   refine ⟨_, _, _⟩,
-  { intros s g,
-    refine s.ι.app ⟨classical.some (this g)⟩ _,
-    let := embedding_sigma_mk.pullback g (classical.some_spec (this g)).left,
-    exact this },
-  { rintros c j, ext g,
+  { exact λ s g, s.ι.app ⟨(e g).1⟩ (e g).2 },
+  { rintro c ⟨j⟩,
+    ext g,
     dsimp at g ⊢,
-    have H : j = ⟨classical.some (this (g ≫ Top.sigma_ι.{(max u u') u'} f j.as))⟩,
-    { ext, unfold_projs,
-      apply (classical.some_spec (this (g ≫ Top.sigma_ι.{(max u u') u'} f j.as))).right j.as,
-      apply set.range_comp_subset_range },
-    apply congr_heq,
-    { congr, exact H.symm },
-    { replace h := congr_arg continuous_map.to_fun (h (g ≫ Top.sigma_ι.{(max u u') u'} f j.as)),
-      have H' : ∀ (j : discrete J) (f₁ f₂ : F.obj (opposite.unop x) ⟶ (discrete.functor f).obj j),
-                  f₁ = f₂ ↔ continuous_map.to_fun f₁ = continuous_map.to_fun f₂,
-      { intros, split; intro h,
-        { exact congr_arg _ h },
-        { ext, exact congr_fun h _ } },
-      refine (ext_to_hext (λ j, @continuous_map.to_fun (F.obj (opposite.unop x)) 
-                                                       ((discrete.functor f).obj j) _ _) H'
-                                                       _ g H.symm).mpr _,
-      refine function.hfunext rfl _, intros y y' h', cases h',
-      exact ((@sigma.mk.inj_iff J (λ i, (discrete.functor f).obj ⟨i⟩)
-                                (classical.some (this (g ≫ Top.sigma_ι.{(max u u') u'} f j.as)))
-                                j.as _ _).mp (congr_fun h y).symm).right } },
+    set φ : (Σ j, F.obj x.unop ⟶ f j) → c.X := λ g, c.ι.app ⟨g.1⟩ g.2,
+    change φ (e (e.symm ⟨j, g⟩)) = φ ⟨j, g⟩,
+    rw [e.apply_symm_apply] },
   { intros c m h', ext g,
-    dsimp,
-    rw ← h' ⟨classical.some (this g)⟩,
-    dsimp, congr,
-    exact h g }
-end.
+    rw [← h'],
+    exact congr_arg m (e.symm_apply_apply g).symm }
+end
 
 def topological_simplex (n : ℕ) :=
   simplex_category.to_Top'_obj (simplex_category.mk n)
@@ -412,12 +370,10 @@ def one_simplex_homeo_interval : topological_simplex 1 ≃ₜ unit_interval := {
   inv_fun := λ t, ⟨(λ i, if i = 0 then t else unit_interval.symm t),
                    by { intro x, change 0 ≤ ite (x = 0) (t : ℝ) (unit_interval.symm t),
                         split_ifs; exact unit_interval.nonneg _ }, 
-                   by { rw finset.univ_fin2,
-                        simp only [unit_interval.coe_symm_eq, finset.sum_insert,
-                                   finset.mem_singleton, fin.zero_eq_one_iff,
-                                    nat.one_ne_zero, not_false_iff, eq_self_iff_true,
-                                    if_true, finset.sum_singleton, fin.one_eq_zero_iff,
-                                    if_false, add_sub_cancel'_right] }⟩,
+                   by { erw [fin.sum_univ_two],
+                        simp only [eq_self_iff_true, unit_interval.coe_symm_eq, if_true,
+                          fin.one_eq_zero_iff, nat.succ_succ_ne_one, if_false,
+                          add_sub_cancel'_right] }⟩,
   left_inv := by {
     intro p, ext i,
     dsimp only [unit_interval.coe_symm_eq, finset.sum_insert,
