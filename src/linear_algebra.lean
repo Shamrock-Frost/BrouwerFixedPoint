@@ -1,6 +1,4 @@
 import linear_algebra.finsupp_vector_space
-import algebra.category.Module.abelian
-import algebra.category.Module.adjunctions
 import algebra.homology.homology
 import algebra.homology.Module
 import algebra.homology.homotopy
@@ -78,50 +76,45 @@ have hST : S ∩ T ⊆ set.range b := (set.inter_subset_left _ _).trans hS,
 by simp only [b.span_of_subset_range, *, ← submodule.comap_inf, set.preimage_inter,
   finsupp.supported_inter]
 
-/-
-Proof idea: `quotient s` is a coequalizer of the congruence `s.rel`,
-and the left adjoint Module.free preserves this colimit.
--/
-open category_theory category_theory.limits
-
 noncomputable
 def basis.quotient (ι : Type*) (R : Type*) (M : Type*) [ring R] [add_comm_group M]
   [module R M] (N : submodule R M) (b : basis ι R M) (s : setoid ι)
   (H : N = submodule.span R (set.image (λ p : ι × ι, b p.fst - b p.snd) { p | p.fst ≈ p.snd }))
-  : basis (quotient s) R (M ⧸ N) :=
-  let p1 : subtype s.rel.uncurry ⟶ ι := _root_.prod.fst ∘ subtype.val,
-      p2 : subtype s.rel.uncurry ⟶ ι := _root_.prod.snd ∘ subtype.val,
-      c1 : cofork ((Module.free R).map p1) ((Module.free R).map p2)
-         := (cocones.precompose (parallel_pair_comp _ _ _).inv).obj
-              ((Module.free R).map_cocone (types.quotient_cocone s)),
-      h1 : is_colimit c1 :=
-        (is_colimit.precompose_inv_equiv (parallel_pair_comp _ _ _) _).inv_fun
-        $ @is_colimit_of_preserves _ _ _ _ _ _ _ _ _
-            (types.quotient_cocone_is_colimit _)
-            (Module.adj R).left_adjoint_preserves_colimits.preserves_colimits_of_shape.preserves_colimit,
-      h2 := preadditive.is_colimit_cokernel_cofork_of_cofork h1,
-      i1 := h2.cocone_point_unique_up_to_iso (Module.cokernel_is_colimit _),
-      i2 : (M ⧸ N) ≃ₗ[R] ((ι →₀ R) ⧸ linear_map.range ((Module.free R).map p1 - (Module.free R).map p2))
-         := submodule.quotient.equiv N _ b.repr
-            $ by { rw H, simp only [Module.free_map],
-                   refine eq.trans (submodule.map_span b.repr.to_linear_map _) _,
-                   rw [linear_map.range_eq_map, ← free_module_basis_spanning,
-                       linear_map.map_span],
-                   refine congr_arg _ _,
-                   rw [← set.image_comp, ← set.range_comp],
-                   ext, split, 
-                   { rintro ⟨⟨i, j⟩, hij, h⟩, subst h,
-                     refine ⟨⟨(i, j), hij⟩, _⟩,
-                     simp only [function.comp_app, linear_map.sub_apply,
-                                 finsupp.lmap_domain_apply, finsupp.map_domain_single,
-                                 linear_equiv.coe_to_linear_map, linear_equiv.map_sub,
-                                 basis.repr_self] },
-                   { rintro ⟨⟨⟨i, j⟩, hij⟩, h⟩, subst h,
-                     refine ⟨(i, j), hij, _⟩,
-                     simp only [linear_equiv.coe_to_linear_map, function.comp_app,
-                                 linear_equiv.map_sub, basis.repr_self, linear_map.sub_apply,
-                                 finsupp.lmap_domain_apply, finsupp.map_domain_single] } }
-  in ⟨i2.trans i1.symm.to_linear_equiv⟩.
+  : basis (quotient s) R (M ⧸ N) := 
+  ⟨linear_equiv.of_linear 
+    (N.liftq (b.constr ℕ (λ i, finsupp.single (quotient.mk i) (1 : R))) $ by {
+      rw [H, linear_map.le_ker_iff_map, eq_bot_iff, submodule.map_span_le], 
+      rintros x ⟨⟨i, j⟩, hij, h⟩, subst h,
+      simp only [map_sub, basis.constr_basis, submodule.mem_bot],
+      apply sub_eq_zero_of_eq,
+      congr' 1,
+      exact quotient.sound hij
+    })
+    (finsupp.lift (M ⧸ N) R _ $ quotient.lift (λ i, N.mkq (b i)) $ by {
+      intros i j hij, 
+      dsimp only [],
+      rw [← sub_eq_zero, ← map_sub, H,
+          submodule.mkq_apply, submodule.quotient.mk_eq_zero],
+      apply submodule.subset_span,
+      exact ⟨(i, j), hij, rfl⟩
+    })
+    (by {
+      apply finsupp.lhom_ext', rintros ⟨i⟩,
+      apply linear_map.ext_ring,
+      apply finsupp.ext, rintros ⟨j⟩,
+      simp only [basis.constr_basis, submodule.mkq_apply, linear_map.coe_comp,
+                 function.comp_app, finsupp.lsingle_apply, finsupp.lift_apply,
+                 finsupp.sum_single_index, zero_smul, one_smul,
+                 submodule.liftq_apply, linear_map.id_comp],
+      refl
+    })
+    (by {
+      apply submodule.linear_map_qext, apply b.ext, intro,
+      simp only [submodule.mkq_apply, basis.constr_basis, linear_map.coe_comp,
+                 function.comp_app, submodule.liftq_apply, finsupp.lift_apply,
+                 finsupp.sum_single_index, quotient.lift_mk, zero_smul, 
+                 one_smul, linear_map.id_comp]
+    })⟩
 
 lemma basis_constr_of_lin_indep_family_injective {ι : Type*} {R : Type*} {M : Type*} {M' : Type*}
   [ring R] [nontrivial R] [add_comm_group M] [module R M] [add_comm_group M'] [module R M']
