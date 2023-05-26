@@ -10,10 +10,9 @@ import category_theory.limits.shapes.comm_sq
 import category_theory.preadditive.additive_functor
 import data.list.tfae
 
-import for_mathlib.homological_complex_abelian
-import for_mathlib.les_homology
-import for_mathlib.preserves_exact
-import for_mathlib.snake_lemma_naturality2
+import LTE_port.homological_complex_abelian
+import LTE_port.preserves_exact
+import LTE_port.snake_lemma_naturality2
 
 import .category_theory .linear_algebra .arrow_category
 
