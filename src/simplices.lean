@@ -3,6 +3,7 @@ import algebraic_topology.simplicial_object
 import analysis.convex.topology
 import algebraic_topology.simplicial_set
 import category_theory.natural_isomorphism
+import topology.category.Top.limits.products
 import .category_theory .general_topology
 
 local attribute [instance]
@@ -369,12 +370,10 @@ def one_simplex_homeo_interval : topological_simplex 1 ≃ₜ unit_interval := {
   inv_fun := λ t, ⟨(λ i, if i = 0 then t else unit_interval.symm t),
                    by { intro x, change 0 ≤ ite (x = 0) (t : ℝ) (unit_interval.symm t),
                         split_ifs; exact unit_interval.nonneg _ }, 
-                   by { rw finset.univ_fin2,
-                        simp only [unit_interval.coe_symm_eq, finset.sum_insert,
-                                   finset.mem_singleton, fin.zero_eq_one_iff,
-                                    nat.one_ne_zero, not_false_iff, eq_self_iff_true,
-                                    if_true, finset.sum_singleton, fin.one_eq_zero_iff,
-                                    if_false, add_sub_cancel'_right] }⟩,
+                   by { erw [fin.sum_univ_two],
+                        simp only [eq_self_iff_true, unit_interval.coe_symm_eq, if_true,
+                          fin.one_eq_zero_iff, nat.succ_succ_ne_one, if_false,
+                          add_sub_cancel'_right] }⟩,
   left_inv := by {
     intro p, ext i,
     dsimp only [unit_interval.coe_symm_eq, finset.sum_insert,
