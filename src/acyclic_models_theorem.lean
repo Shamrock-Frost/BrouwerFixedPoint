@@ -27,7 +27,9 @@ structure functor_basis (F : C ⥤ (Module.{v'} R)) : Type (max u u' v (v' + 1) 
 noncomputable
 def functor_basis.get_basis {F : C ⥤ Module.{v'} R} (b : functor_basis F) (X : C)
   : basis (Σ (i : b.indices), b.models i ⟶ X) R (F.obj X) :=
-basis.mk (b.lin_indep X) (by { rw ← b.spanning X, congr, ext, simp })
+basis.mk (b.lin_indep X) $ le_of_eq $ by {
+  rw ← b.spanning X, congr, ext, simp only [sigma.exists]
+}
 
 noncomputable
 def functor_basis.map_out {F : C ⥤ Module.{v'} R} (b : functor_basis F)
@@ -37,8 +39,10 @@ def functor_basis.map_out {F : C ⥤ Module.{v'} R} (b : functor_basis F)
       intros X Y f,
       apply basis.ext (b.get_basis X), rintro ⟨i, g⟩,
       rw [comp_apply, (_ : F.map f (b.get_basis X ⟨i, g⟩) = b.get_basis Y ⟨i, g ≫ f⟩)],
-      simp [basis.constr_basis],
-      simp [functor_basis.get_basis]
+      simp only [basis.constr_basis, functor.map_comp, Module.coe_comp, 
+                 function.comp_app],
+      simp only [functor_basis.get_basis, basis.coe_mk, functor.map_comp,
+                 Module.coe_comp]
      }
   }
 
@@ -68,19 +72,24 @@ begin
     obtain ⟨y, hy⟩ := H i,
     existsi (G.map f).f 1 y,
     rw [← comp_apply ((G.map f).f 1)],
-    simp,
+    simp only [functor.comp_map, homological_complex.eval_map, Module.coe_comp,
+               function.comp_app, homological_complex.hom.comm],
     rw [← comp_apply, ← homological_complex.comp_f, α.naturality],
-    dsimp, rw hy, simp,
+    dsimp, rw hy, simp only [map_add],
     rw [← comp_apply, ← homological_complex.comp_f, ← β.naturality], refl },
   { existsi (0 : ((G.obj X).X 1)),
-    rw [map_zero ((α.app X).f 0), map_zero ((β.app X).f 0), map_zero ((G.obj X).d 1 0)], simp },
+    rw [map_zero ((α.app X).f 0), map_zero ((β.app X).f 0), map_zero ((G.obj X).d 1 0)],
+    simp only [add_zero] },
   { rintros u v ⟨y, h⟩ ⟨z, h'⟩,
     existsi (y + z : (G.obj X).X 1),
-    rw [map_add ((α.app X).f 0), map_add ((β.app X).f 0), map_add ((G.obj X).d 1 0), h, h'], 
-    rw [add_assoc, add_assoc (((β.app X).f 0) u)], exact congr_arg _ (add_left_comm _ _ _) },
+    rw [map_add ((α.app X).f 0), map_add ((β.app X).f 0), 
+        map_add ((G.obj X).d 1 0), h, h'], 
+    rw [add_assoc, add_assoc (((β.app X).f 0) u)], 
+    exact congr_arg _ (add_left_comm _ _ _) },
   { rintros s u ⟨y, h⟩,
     existsi (s • y : (G.obj X).X 1),
-    rw [map_smul ((α.app X).f 0), map_smul ((β.app X).f 0), map_smul ((G.obj X).d 1 0), h],
+    rw [map_smul ((α.app X).f 0), map_smul ((β.app X).f 0),
+        map_smul ((G.obj X).d 1 0), h],
     apply smul_add }
 end
 
@@ -101,7 +110,10 @@ def lift_nat_trans_deg0
   (b 0).map_out (G ⋙ homological_complex.eval _ _ 0)
                 (λ i, (G.obj ((b 0).models i)).preim_of_homology_class
                         (ϕ.app ((b 0).models i)
-                               (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩)))
+                               (Module.to_homology ⟨(b 0).basis_elem i, by
+    simp only [homological_complex.d_from_eq_zero, chain_complex.next_nat_zero,
+               complex_shape.down_rel, nat.one_ne_zero,
+  not_false_iff, linear_map.ker_zero]⟩)))
 
 lemma lift_nat_trans_deg0_is_lift
   {F : C ⥤ chain_complex (Module.{v'} R) ℕ} (b : complex_functor_basis F)
@@ -123,31 +135,44 @@ lemma lift_nat_trans_deg0_is_lift
     in suffices lhs_hom = rhs_hom,
     by { intros, have := congr_fun (congr_arg coe_fn this) x,
          refine eq.trans _ (eq.trans this (eq.symm _));
-         dsimp [lhs_hom, rhs_hom]; delta Module.to_homology; congr,
+         dsimp only [lhs_hom, rhs_hom]; delta Module.to_homology; congr,
          { apply is_iso.eq_app_inv_of_app_hom_eq (kernel_subobject ((G.obj X).d_from 0)).arrow,
            apply Module.to_kernel_subobject_arrow },
          { apply is_iso.eq_app_inv_of_app_hom_eq (kernel_subobject ((F.obj X).d_from 0)).arrow,
            apply Module.to_kernel_subobject_arrow } },
     by { apply basis.ext ((b 0).get_basis X), rintro ⟨i, f⟩,
-         simp [lift_nat_trans_deg0],
-         rw map_out_desc, simp,
+         simp only [lift_nat_trans_deg0, Module.coe_comp, function.comp_app],
+         rw map_out_desc, 
+         simp only [functor.comp_map, homological_complex.eval_map],
          obtain ⟨h, h'⟩ := (G.obj ((b 0).models i)).preim_of_homology_class_spec
                             (ϕ.app ((b 0).models i)
-                            (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩)),
+                            (Module.to_homology ⟨(b 0).basis_elem i, by
+    simp only [homological_complex.d_from_eq_zero, chain_complex.next_nat_zero,
+               complex_shape.down_rel, nat.one_ne_zero, not_false_iff,
+               linear_map.ker_zero]⟩)),
          transitivity (G ⋙ homology_functor (Module R) _ 0).map f
                         (Module.to_homology
                           ⟨(G.obj ((b 0).models i)).preim_of_homology_class
                             (ϕ.app ((b 0).models i)
-                                   (Module.to_homology ⟨(b 0).basis_elem i, by simp⟩)),
-                           h⟩),
+                                   (Module.to_homology ⟨(b 0).basis_elem i, by
+    simp only [homological_complex.d_from_eq_zero, chain_complex.next_nat_zero,
+               complex_shape.down_rel, nat.one_ne_zero, not_false_iff,
+               linear_map.ker_zero]⟩)), h⟩),
          { rw [category_theory.functor.comp_map, homology_functor_map, homology.π_map_apply],
            apply congr_arg, symmetry,
-           apply is_iso.eq_app_inv_of_app_hom_eq, simp },
+           apply is_iso.eq_app_inv_of_app_hom_eq, simp only [kernel_subobject_map_arrow_apply, homological_complex.hom.sq_from_left, Module.to_kernel_subobject_arrow] },
          { rw [h', ← category_theory.comp_apply, ← ϕ.naturality],
-           dsimp, rw homology.π_map_apply,
+           dsimp only [homological_complex.d_from_eq_zero, chain_complex.next_nat_zero, 
+                       complex_shape.down_rel, nat.one_ne_zero, not_false_iff,
+                       linear_map.ker_zero, homological_complex.d_to_comp_d_from],
+           dsimp,
+           rw homology.π_map_apply,
            congr,
            apply is_iso.eq_app_inv_of_app_hom_eq,
-           simp [functor_basis.get_basis, basis.mk_apply] } }
+           simp only [functor_basis.get_basis, basis.mk_apply, 
+                      kernel_subobject_map_arrow_apply, functor.comp_map,
+                      homological_complex.hom.sq_from_left,
+                      Module.to_kernel_subobject_arrow, homological_complex.eval_map] } }
 
 lemma first_step_zero_in_homology
   {F : C ⥤ chain_complex (Module.{v'} R) ℕ} (b : complex_functor_basis F)
@@ -162,7 +187,10 @@ lemma first_step_zero_in_homology
         ((F.obj ((b 1).models i)).d 1 0 ((b 1).basis_elem i)), h⟩
     = (0 : ((G.obj ((b 1).models i)).homology 0)) :=
 begin
-  transitivity, apply lift_nat_trans_deg0_is_lift, simp,
+  transitivity, apply lift_nat_trans_deg0_is_lift,
+  simp only [homological_complex.d_from_eq_zero, chain_complex.next_nat_zero, 
+             complex_shape.down_rel, nat.one_ne_zero, not_false_iff,
+             linear_map.ker_zero],
   refine eq.trans _ (map_zero (ϕ.app ((b 1).models i))), congr,
   rw ← Module.to_homology_eq_zero (complex_shape.down_mk 1 0 (nat.zero_add 1)),
   apply linear_map.mem_range_self
@@ -210,7 +238,8 @@ begin
   rw homological_complex.preim_cycle_of_to_homology_zero_spec,
   rw ← category_theory.comp_apply _ ((G.map f).f n),
   rw [← homological_complex.eval_map, ← category_theory.functor.comp_map, ← ψ.naturality],
-  apply congr_arg (ψ.app X), dsimp,
+  apply congr_arg (ψ.app X), 
+  dsimp,
   rw [← category_theory.comp_apply, ← (F.map f).comm' _ _ (complex_shape.down_mk (n + 1) n rfl)],
   dsimp [functor_basis.get_basis],
   rw basis.mk_apply
@@ -223,7 +252,10 @@ def lift_nat_trans_deg1
   (ϕ : (F ⋙ homology_functor (Module R) _ 0) ⟶ (G ⋙ homology_functor (Module R) _ 0))
   : (F ⋙ homological_complex.eval _ _ 1) ⟶ (G ⋙ homological_complex.eval _ _ 1) :=
   lift_nat_trans_step b G 0 (lift_nat_trans_deg0 b G ϕ)
-                      (by { intro, simp })
+                      (by { intro,
+    simp only [homological_complex.d_from_eq_zero, 
+               complex_shape.down_rel, nat.one_ne_zero, not_false_iff,
+               linear_map.ker_zero, chain_complex.next_nat_zero] })
                       (λ i, first_step_zero_in_homology b G ϕ i _) 
 
 noncomputable
@@ -239,7 +271,10 @@ def lift_nat_trans_nth_aux
 | 0       := have H : ∀ i, (lift_nat_trans_deg0 b G ϕ).app ((b 1).models i)
                              ((F.obj ((b 1).models i)).d 1 0 ((b 1).basis_elem i))
                            ∈ linear_map.ker ((G.obj ((b 1).models i)).d_from 0),
-             by simp,
+             by simp only [homological_complex.d_from_eq_zero, nat.one_ne_zero,
+                           chain_complex.next_nat_zero, complex_shape.down_rel,
+                           not_false_iff, linear_map.ker_zero, submodule.mem_top,
+                           implies_true_iff],
              ⟨lift_nat_trans_deg0 b G ϕ, lift_nat_trans_deg1 b G ϕ,
               step_chain_map b G 0 (lift_nat_trans_deg0 b G ϕ) H
                              (λ i, first_step_zero_in_homology b G ϕ i (H i))⟩
@@ -250,11 +285,14 @@ def lift_nat_trans_nth_aux
                      ((F.obj ((b (n + 1 + 1)).models i)).d (n + 1 + 1) (n + 1)
                        ((b (n + 1 + 1)).basis_elem i))
                    ∈ linear_map.ker ((G.obj ((b (n + 1 + 1)).models i)).d_from (n + 1)),
-             by { intro, simp, rw ← category_theory.comp_apply,
+             by { intro, simp only [linear_map.mem_ker],
+                  rw ← category_theory.comp_apply,
                   rw homological_complex.d_from_eq _ (complex_shape.down_mk (n + 1) n rfl),
-                  rw ← category_theory.category.assoc, rw h, simp, 
+                  rw ← category_theory.category.assoc, rw h,
+                  simp only [Module.coe_comp, function.comp_app], 
                   rw ← category_theory.comp_apply _ (homological_complex.d _ _ _),
-                  simp },
+                  simp only [homological_complex.d_comp_d, map_zero,
+                             linear_map.zero_apply] },
              let H' := λ i, all_eq_zero_of_iso_zero ((H_acyclic (n + 1) n.zero_lt_succ).right i) in
              ⟨curr, lift_nat_trans_step b G (n + 1) curr H (λ i, H' i _), 
                     step_chain_map b G (n + 1) curr H (λ i, H' i _)⟩
@@ -269,8 +307,10 @@ def lift_nat_trans
   : F ⟶ G :=
   homological_complex_functor.mk_nat_trans
     (λ n, (lift_nat_trans_nth_aux b G H_acyclic ϕ n).fst)
-    (by { intros i j h X, dsimp at h, subst h, dsimp [lift_nat_trans_nth_aux],
-          rcases lift_nat_trans_nth_aux b G H_acyclic ϕ j with ⟨prev, curr, h⟩, apply h })
+    (by { intros i j h X, dsimp at h, subst h, 
+          dsimp only [lift_nat_trans_nth_aux],
+          rcases lift_nat_trans_nth_aux b G H_acyclic ϕ j with ⟨prev, curr, h⟩, 
+          apply h })
 
 lemma lift_nat_trans_spec
   {F : C ⥤ chain_complex (Module.{v'} R) ℕ} (b : complex_functor_basis F)
@@ -280,8 +320,12 @@ lemma lift_nat_trans_spec
   : whisker_right (lift_nat_trans b G H_acyclic ϕ) (homology_functor (Module R) _ 0) = ϕ := 
 begin
   apply nat_trans.ext, funext, apply Module.homology_ext', rintro ⟨x, h⟩,
-  rw ← lift_nat_trans_deg0_is_lift b G ϕ X x h (by simp),
-  delta Module.to_homology, simp,
+  rw ← lift_nat_trans_deg0_is_lift b G ϕ X x h (by 
+    simp only [homological_complex.d_from_eq_zero, chain_complex.next_nat_zero,
+               complex_shape.down_rel, nat.one_ne_zero, not_false_iff,
+               linear_map.ker_zero]),
+  delta Module.to_homology, 
+  simp only [whisker_right_app, homology_functor_map, homology.π_map_apply],
   refine congr_arg _ _,
   apply Module.cycles_map_to_cycles
 end
@@ -299,19 +343,29 @@ def chain_htpy_of_lifts_deg0
                 (λ i, (G.obj ((b 0).models i)).preim_cycle_of_to_homology_zero
                         (complex_shape.down_mk 1 0 rfl)
                         (((α - β).app ((b 0).models i)).f 0 ((b 0).basis_elem i))
-                        (by simp)
+                        (by { refine eq.trans (congr_fun (congr_arg _ (homological_complex.d_from_eq_zero _ _)) _)
+                                              (linear_map.zero_apply _),
+                              simp only [chain_complex.next_nat_zero, not_false_iff,
+                                         complex_shape.down_rel, nat.one_ne_zero] })
 (begin
   have h1 := congr_fun (congr_arg nat_trans.app same_map_on_H0) ((b 0).models i),
   have h2 := whisker_eq (Module.as_hom_right (is_linear_map.mk' _ (Module.to_homology.homomorphism
                                                                     (F.obj ((b 0).models i)) 0)))
                         h1,
   let basis_elem' : linear_map.ker ((F.obj ((b 0).models i)).d_from 0)
-                  := ⟨(b 0).basis_elem i, by simp⟩, 
+                  := ⟨(b 0).basis_elem i,
+    by simp only [homological_complex.d_from_eq_zero, not_false_iff,
+                  complex_shape.down_rel, nat.one_ne_zero, 
+                  linear_map.ker_zero, chain_complex.next_nat_zero]⟩, 
   have h3 := sub_eq_zero.mpr (congr_fun (congr_arg coe_fn h2) basis_elem'),
   refine eq.trans (eq.symm _) h3,
   repeat { rw [whisker_right_app, Module.to_homology_comp_homology_functor_map,
                comp_apply, Module.of_hom_apply] },
-  rw ← map_sub, apply congr_arg, apply subtype.eq, simp
+  rw ← map_sub, apply congr_arg, apply subtype.eq,
+  simp only [linear_map.dom_restrict_apply, subtype.val_eq_coe,
+             add_subgroup_class.coe_sub, linear_map.cod_restrict_apply,
+             submodule.coe_mk, nat_trans.app_sub, linear_map.sub_apply,
+             homological_complex.sub_f_apply]
 end))
 
 lemma chain_htpy_of_lifts_deg0_chain_htpy
@@ -336,7 +390,7 @@ begin
       ← homological_complex.comp_f, β.naturality,
       map_sub ((G.map f).f 0), sub_add,
       ← comp_apply, ← homological_complex.comp_f, α.naturality],
-  simp
+  simp only [homological_complex.comp_f, Module.coe_comp, sub_self, sub_zero]
 end
 
 noncomputable
@@ -371,7 +425,8 @@ def chain_htpy_of_lifts_step
                                        at this,
                                     refine eq.trans _ (eq.trans this.symm _),
                                     -- No idea why this works with the rewrite but not without it
-                                    { rw ← linear_map.to_fun_eq_coe, simp },
+                                    { rw ← linear_map.to_fun_eq_coe, 
+                                      simp only [linear_map.to_fun_eq_coe, map_zero] },
                                     { rw [linear_map.add_apply, sub_add_eq_sub_sub_swap], refl } })
                               ((H_acyclic (n + 1) (nat.zero_lt_succ n)).left i))
 
@@ -397,14 +452,16 @@ begin
   apply basis.ext ((b (n + 1)).get_basis X), rintro ⟨i, f⟩,
   dsimp [chain_htpy_of_lifts_step],
   rw map_out_desc,
-  dsimp,
+  dsimp [],
   rw [← comp_apply ((G.map f).f (n + 2)), (G.map f).comm, comp_apply],
   rw homological_complex.preim_cycle_of_homology_zero_spec,
-  simp [homological_complex.d_nat_trans, functor_basis.get_basis, basis.mk_apply],
+  simp only [homological_complex.d_nat_trans, functor_basis.get_basis,
+             basis.mk_apply, functor.comp_map, homological_complex.eval_map],
   rw [map_sub ((G.map f).f (n + 1)), map_sub ((G.map f).f (n + 1))],
   have : ∀ a b c d e f : (G.obj X).X (n + 1),
         (a = c) → (b = e) → (f = d) → a = (b + (c - d - e)) + f,
-  { intros a b c d e f h1 h2 h3, subst h1, subst h2, subst h3, simp },
+  { intros a b c d e f h1 h2 h3, subst h1, subst h2, subst h3, 
+    simp only [add_sub_cancel'_right, sub_add_cancel] },
   apply this;
   try { rw [← comp_apply, ← homological_complex.comp_f, nat_trans.naturality], refl },
   rw [← comp_apply ((F.map f).f (n + 1)), (F.map f).comm,

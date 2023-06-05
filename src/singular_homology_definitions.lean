@@ -11,8 +11,6 @@ import algebraic_topology.topological_simplex
 import category_theory.adjunction.limits
 import algebra.category.Module.colimits
 
-import LTE_port.ab4
-
 import .homological_algebra
 import .preserves_colimits_functor_category .alternating_face_map_complex .Module_AB4
 
@@ -63,27 +61,28 @@ lemma singular_chain_complex_differential_desc (R : Type*) [comm_ring R] {X : To
   : ((singular_chain_complex R).obj X).d (n + 1) n (finsupp.single σ 1)
   = ∑ (i : fin (n + 2)), (-1 : ℤ)^(i : ℕ)
   • simplex_to_chain (simplex_category.to_Top'.map (simplex_category.δ i) ≫ σ) R := by {
-    dsimp [singular_chain_complex, free_complex_on_sset],
+    dsimp only [singular_chain_complex, free_complex_on_sset],
     transitivity (alternating_face_map_complex.obj_d
                      (((simplicial_object.whiskering Type (Module R)).obj (Module.free R)).obj
                                                                           (Top.to_sSet'.obj X)) n)
                      .to_fun
                      (finsupp.single σ 1),
     { congr, apply chain_complex.of_d },
-    { simp [alternating_face_map_complex.obj_d],
+    { simp only [alternating_face_map_complex.obj_d, linear_map.to_fun_eq_coe,
+                 linear_map.coe_fn_sum, fintype.sum_apply, linear_map.smul_apply],
       congr, ext i, congr,
-      dsimp [simplex_to_chain],
+      dsimp only [simplex_to_chain],
       rw finsupp.eq_single_iff, split,
       { intros t h,
         rw finset.mem_singleton,
-        simp at h,
-        have : ((Module.free R).map ((Top.to_sSet'.obj X).δ i) (finsupp.single σ 1)).to_fun t ≠ 0 := h,
-        simp at this,
-        exact and.left (finsupp.single_apply_ne_zero.mp this) },
+        simp only [finsupp.mem_support_iff, ne.def] at h,
+        change ((Module.free R).map ((Top.to_sSet'.obj X).δ i) (finsupp.single σ 1)).to_fun t ≠ 0 at h,
+        simp only [Module.free_map, finsupp.lmap_domain_apply, finsupp.map_domain_single, ne.def] at h,
+        exact and.left (finsupp.single_apply_ne_zero.mp h) },
       { change (((Module.free R).map ((Top.to_sSet'.obj X).δ i) (finsupp.single σ 1)).to_fun
                   (simplex_category.to_Top'.map (simplex_category.δ i) ≫ σ) = 1),
-        simp,
-        exact finsupp.single_eq_same } }
+        simp only [Module.free_map, finsupp.lmap_domain_apply, finsupp.map_domain_single],
+        convert finsupp.single_eq_same } }
   }
 
 lemma singular_chain_complex_differential_desc_deg_0 (R : Type*) [comm_ring R] {X : Top}
@@ -94,8 +93,9 @@ lemma singular_chain_complex_differential_desc_deg_0 (R : Type*) [comm_ring R] {
 begin
   rw singular_chain_complex_differential_desc,
   rw finset.sum_eq_add_of_mem (0 : fin 2) 1 (finset.mem_univ _) (finset.mem_univ _),
-  { simp, rw sub_eq_add_neg },
-  { simp },
+  { simp only [fin.coe_zero, pow_zero, one_zsmul, fin.coe_one, pow_one, neg_smul],
+    rw sub_eq_add_neg },
+  { simp only [ne.def, fin.zero_eq_one_iff, nat.succ_succ_ne_one, not_false_iff]},
   { intros c H' H, exfalso, cases c with c hc, cases H,
     cases c, contradiction, cases c, contradiction,
     rw [nat.succ_lt_succ_iff, nat.succ_lt_succ_iff] at hc,
@@ -107,7 +107,6 @@ lemma singular_chain_complex_map_inj (R : Type*) [comm_ring R] {X Y : Top}
   : function.injective (((singular_chain_complex R).map f).f n) :=
 begin
   refine finsupp.map_domain_injective (λ σ τ hστ, _),
-  dsimp at hστ, 
   ext p,
   have := congr_arg (λ g : topological_simplex n → Y, g p)
                     (congr_arg continuous_map.to_fun hστ),

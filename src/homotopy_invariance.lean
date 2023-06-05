@@ -10,7 +10,7 @@ import algebraic_topology.simplex_category
 import algebraic_topology.topological_simplex
 import topology.constructions
 import topology.algebra.group_with_zero
-import topology.category.CompHaus.default
+import topology.category.CompHaus.basic
 import topology.homotopy.product topology.homotopy.contractible
 import analysis.convex.contractible
 import analysis.convex.topology
