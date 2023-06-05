@@ -1172,7 +1172,7 @@ begin
   constructor,
   intro i,
   suffices : function.bijective ((homology_functor (Module R) c i).map f),
-  { let f' := linear_equiv.of_bijective _ this.left this.right,
+  { let f' := linear_equiv.of_bijective _ this,
     constructor,
     refine exists.intro f'.symm _,
     split; apply Module.homology_ext'; intro,

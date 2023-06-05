@@ -39,21 +39,28 @@ instance Module.forget₂_AddCommGroup_preserves_mono {R : Type*} [ring R]
 
 instance coextension.module_structure (R : Type*) [ring R] (G : Type*) [add_comm_group G]
   : module R (R →+ G) := {
-    smul := λ r f, ⟨(λ x, f (x * r)), (by simp), (by { intros, simp [add_mul] })⟩,
-    one_smul  := by { intros, simp },
-    mul_smul  := by { intros, ext, simp [mul_assoc] },
-    smul_add  := by { intros, ext, simp },
-    smul_zero := by { intros, ext, simp },
-    add_smul  := by { intros, ext, simp [mul_add] },
-    zero_smul := by { intros, ext, simp }
-  }.
+    smul := λ r f, ⟨(λ x, f (x * r)), (by simp only [zero_mul, map_zero]),
+                                      (by { intros, simp only [add_mul, map_add] })⟩,
+    one_smul  := by { intros, simp only [mul_one, add_monoid_hom.mk_coe] },
+    mul_smul  := by { intros, ext, simp only [mul_assoc, add_monoid_hom.coe_mk] },
+    smul_add  := by { intros, ext, simp only [add_monoid_hom.coe_mk, add_monoid_hom.add_apply] },
+    smul_zero := by { intros, ext, simp only [add_monoid_hom.coe_mk, add_monoid_hom.zero_apply] },
+    add_smul  := by { intros, ext, simp only [mul_add, map_add, add_monoid_hom.coe_mk,
+                                              add_monoid_hom.add_apply] },
+    zero_smul := by { intros, ext, simp only [map_zero, add_monoid_hom.coe_mk,
+                                              add_monoid_hom.zero_apply, mul_zero] }
+  }
 
 def coextension.map' (R : Type*) [ring R] {G H : Type*} [add_comm_group G] [add_comm_group H]
   (ϕ : G →+ H) : (R →+ G) →ₗ[R] (R →+ H) := {
-    to_fun := λ f, ⟨ϕ.comp f, by simp, by { intros, simp }⟩,
-    map_add' := by { intros, ext, simp },
-    map_smul' := by { intros, ext, simp, refl }
-  }.
+    to_fun := λ f, ⟨ϕ.comp f, by simp only [map_zero], by { intros, simp only [map_add] }⟩,
+    map_add' := by { intros, ext, simp only [map_add, add_monoid_hom.coe_comp,
+                                             add_monoid_hom.coe_mk, function.comp_app,
+                                             add_monoid_hom.add_apply] },
+    map_smul' := by { intros, ext, simp only [add_monoid_hom.coe_comp,
+                                              add_monoid_hom.coe_mk, function.comp_app,
+                                              ring_hom.id_apply], refl }
+  }
 
 def Module.coextension (R : Type*) [ring R] : AddCommGroup ⥤ Module R := {
   obj := λ G, Module.of R (R →+ G),
@@ -63,16 +70,18 @@ def Module.coextension (R : Type*) [ring R] : AddCommGroup ⥤ Module R := {
 def Module.restriction_coextension_adj_unit (R : Type*) [ring R]
   (M : Type*) [add_comm_group M] [module R M] : M →ₗ[R] (R →+ M) := {
     to_fun := λ x, ⟨(λ r, r • x), zero_smul R x, (λ r s, add_smul r s x)⟩,
-    map_add' := by { intros, ext, simp },
-    map_smul' := by { intros, ext, simp, symmetry, apply mul_smul }
-  }.
+    map_add' := by { intros, ext, simp only [smul_add, add_monoid_hom.coe_mk,
+                                             add_monoid_hom.add_apply] },
+    map_smul' := by { intros, ext, simp only [add_monoid_hom.coe_mk, ring_hom.id_apply],
+                      symmetry, apply mul_smul }
+  }
 
 def Module.restriction_coextension_adj_counit (R : Type*) [ring R]
   (G : Type*) [add_comm_group G] : (R →+ G) →+ G := {
     to_fun := λ f, f 1,
     map_zero' := rfl,
     map_add' := λ x y, rfl
-  }.
+  }
 
 def Module.restriction_coextension_adj (R : Type*) [ring R]
   : forget₂ (Module R) AddCommGroup ⊣ Module.coextension R := 
@@ -106,11 +115,12 @@ lemma sigma_comparison_naturality {β : Type*} {C : Type*} [category C] {D : Typ
   ≫ sigma_comparison G g :=
 begin
   ext,
-  simp [sigma_comparison],
+  simp only [sigma_comparison, colimit.ι_desc_assoc, cofan.mk_ι_app,
+             ι_colim_map_assoc, discrete.nat_trans_app, colimit.ι_desc],
   rw [← G.map_comp, ← G.map_comp],
   refine congr_arg _ _,
   delta sigma.ι,
-  simp
+  simp only [ι_colim_map, discrete.nat_trans_app]
 end
 
 -- not sure about the universes here
@@ -136,7 +146,9 @@ begin
   { apply_instance },
   { apply_with mono_comp {instances:=ff},
     { convert AB4.cond (F.obj ∘ X) (F.obj ∘ Y) (λ a, F.map (f a)) (λ a, F.map_mono (f a)),
-      delta sigma.desc cofan.mk colim_map is_colimit.map cocones.precompose, dsimp,
+      delta sigma.desc cofan.mk colim_map is_colimit.map cocones.precompose,
+      dsimp only [category.assoc, cocone_morphism.w, eq_self_iff_true, category.comp_id,
+                  discrete.functor_map_id, category.id_comp],
       congr,
       ext a, cases a, refl },
     { apply_instance } }
