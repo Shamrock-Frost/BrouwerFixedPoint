@@ -78,7 +78,7 @@ by simp only [b.span_of_subset_range, *, ← submodule.comap_inf, set.preimage_i
               finsupp.supported_inter]
 
 noncomputable
-def basis.quotient (ι : Type*) (R : Type*) (M : Type*) [ring R] [add_comm_group M]
+def basis.quotient (ι : Type u) (R : Type v) (M : Type w) [ring R] [add_comm_group M]
   [module R M] (N : submodule R M) (b : basis ι R M) (s : setoid ι)
   (H : N = submodule.span R (set.image (λ p : ι × ι, b p.fst - b p.snd) { p | p.fst ≈ p.snd }))
   : basis (quotient s) R (M ⧸ N) := 
