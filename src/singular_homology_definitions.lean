@@ -39,6 +39,16 @@ noncomputable
 def singular_homology_of_pair (R : Type*) [comm_ring R] (n : ℕ) : arrow Top ⥤ Module R :=
   singular_chain_complex_of_pair R ⋙ homology_functor _ _ n
 
+noncomputable
+def singular_homology_of_base_to_of_pair (R : Type*) [comm_ring R] (n : ℕ)
+  : arrow.right_func ⋙ singular_homology R n ⟶ singular_homology_of_pair R n := 
+  (functor.associator arrow.right_func (singular_chain_complex R)
+                      (homology_functor (Module R) (complex_shape.down ℕ) n)).inv
+  ≫ whisker_right
+      (whisker_left (singular_chain_complex R).map_arrow
+                    (coker_functor_proj (chain_complex (Module R) ℕ)))
+      (homology_functor (Module R) (complex_shape.down ℕ) n).
+
 def singular_zero_simplex_of_pt {X : Top} (x0 : X)
   : (Top.to_sSet'.obj X).obj (opposite.op (simplex_category.mk 0)) := 
   (continuous_map.const (topological_simplex 0) x0)

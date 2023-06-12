@@ -1,7 +1,7 @@
 import category_theory.abelian.exact
 import LTE_port.split_exact
 
-universes v u u'
+universes v' v u u'
 
 namespace category_theory
 
@@ -9,7 +9,7 @@ namespace functor
 
 open category_theory.limits
 
-variables {A : Type u} {B : Type u'} [category.{v} A] [category.{v} B]
+variables {A : Type u} {B : Type u'} [category.{v} A] [category.{v'} B]
   [abelian A] [abelian B] (F : A ⥤ B) [functor.additive F]
   [preserves_finite_limits F] [preserves_finite_colimits F]
 

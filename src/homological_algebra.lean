@@ -411,29 +411,6 @@ begin
 end
 
 -- LTE's version is insufficiently universe polymorphic
-section
-universes u₁ u₂ v₁ v₂
-
-lemma my_map_short_exact {A : Type u₁} {B : Type u₂} [category.{v₁} A] [category.{v₂} B]
-  [abelian A] [abelian B] (F : A ⥤ B) [functor.additive F]
-  [preserves_finite_limits F] [preserves_finite_colimits F]
-  {X Y Z : A} (f : X ⟶ Y) (g : Y ⟶ Z)
-  (h : short_exact f g) : short_exact (F.map f) (F.map g) :=
-begin
-  rcases h with ⟨h1, h2⟩,
-  haveI : mono (F.map f),
-  { rw (abelian.tfae_mono X f).out 0 2 at h_mono,
-    rw (abelian.tfae_mono (F.obj X) (F.map f)).out 0 2,
-    have := F.map_exact _ _ h_mono, rwa F.map_zero at this, },
-  haveI : epi (F.map g),
-  { rw (abelian.tfae_epi Z g).out 0 2 at h_epi,
-    rw (abelian.tfae_epi (F.obj Z) (F.map g)).out 0 2,
-    have := F.map_exact _ _ h_epi, rwa F.map_zero at this, },
-  refine ⟨F.map_exact f g ⟨h1, h2⟩⟩
-end
-
-end
-
 def coker_functor_degreewise_SES [abelian V]
   {A X : homological_complex V c} (i : A ⟶ X) [mono i]
   : ∀ ℓ, short_exact (i.f ℓ)
@@ -441,7 +418,7 @@ def coker_functor_degreewise_SES [abelian V]
 begin
   intro,
   rw [ ← homological_complex.eval_map, ← homological_complex.eval_map],
-  apply my_map_short_exact,
+  apply (eval V c ℓ).map_short_exact,
   dsimp only [coker_functor_proj],
   refine short_exact.mk _,
   apply snake_diagram.exact_self_cokernel_π
@@ -514,6 +491,16 @@ lemma short_exact_prev [abelian V] (ℓ : ι) {A B C : homological_complex V c}
   { mono := by { haveI := λ m, (h m).mono, apply_instance },
     exact := exact_prev' _ _ ℓ (λ m, (h m).exact),
     epi := @homological_complex.epi_prev' _ _ _ _ _ _ _ _ _ (λ m, (h m).epi) }
+
+lemma iso_of_four_term_exact_seq_start_zero_end_mono {V : Type*} [category V] [abelian V]
+  {A B C D E : V} {f : A ⟶ B} {g : B ⟶ C} {h : C ⟶ D} {i : D ⟶ E}
+  (e : exact_seq V [f, g, h, i]) (hf : f = 0) (hi : mono i) : is_iso g :=
+begin
+  apply_with is_iso_of_mono_of_epi {instances:=ff}, { apply_instance },
+  { exact exact.mono_of_eq_zero ((exact_iff_exact_seq _ _).mpr (e.extract 0 2)) hf },
+  { refine exact.epi_of_eq_zero ((exact_iff_exact_seq _ _).mpr (e.extract 1 2)) _, 
+    exact (exact.mono_iff_eq_zero ((exact_iff_exact_seq _ _).mpr (e.extract 2 2))).mp hi } 
+end
 
 -- shouldn't need abelian, but we need the category of homological complexes to have images
 -- Suggests LTE has something messed up in its typeclasses

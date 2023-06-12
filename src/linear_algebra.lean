@@ -131,3 +131,25 @@ begin
   specialize hf _ hm,
   rw linear_equiv.map_eq_zero_iff at hf, exact hf
 end
+
+lemma injective_of_basis_to_basis_and_injective_on_basis {R : Type*} [ring R] 
+  {M N : Type*} [add_comm_group M] [add_comm_group N] [module R M] [module R N]
+  {ι ι' : Type*} (bM : basis ι R M) (bN : basis ι' R N) (f : M →ₗ[R] N)
+  (h1 : ∀ i, f (bM i) ∈ set.range bN) (h2 : ∀ i j, f (bM i) = f (bM j) → i = j)
+  : function.injective f := 
+begin
+  rw [← linear_map.ker_eq_bot, linear_map.ker_eq_bot'],
+  intros m hm,
+  rw ← basis.total_repr bM m at ⊢ hm,
+  dsimp [finsupp.total] at hm,
+  simp at hm,
+  rw linear_independent_iff.mp _ (bM.repr m) hm, simp,
+  let get_mapped_idx := λ i, classical.some (h1 i),
+  have get_mapped_idx_spec : ∀ i, bN (get_mapped_idx i) = f (bM i) := 
+    λ i, classical.some_spec (h1 i),
+  simp_rw ← get_mapped_idx_spec,
+  apply linear_independent.comp bN.linear_independent,
+  intros i j h,
+  apply h2,
+  exact eq.trans (get_mapped_idx_spec i).symm (eq.trans (congr_arg bN h) (get_mapped_idx_spec j))
+end

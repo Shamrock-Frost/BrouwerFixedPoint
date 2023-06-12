@@ -2,53 +2,6 @@ import .homotopy_invariance
 
 open category_theory
 
-noncomputable
-def singular_homology_of_base_to_of_pair (R : Type*) [comm_ring R] (n : ℕ)
-  : arrow.right_func ⋙ singular_homology R n ⟶ singular_homology_of_pair R n := 
-  (functor.associator arrow.right_func (singular_chain_complex R)
-                      (homology_functor (Module R) (complex_shape.down ℕ) n)).inv
-  ≫ whisker_right
-      (whisker_left (singular_chain_complex R).map_arrow
-                    (coker_functor_proj (chain_complex (Module R) ℕ)))
-      (homology_functor (Module R) (complex_shape.down ℕ) n).
-
-/-
-Should move these lemmas
--/
-
-lemma iso_of_four_term_exact_seq_start_zero_end_mono {V : Type*} [category V] [abelian V]
-  {A B C D E : V} {f : A ⟶ B} {g : B ⟶ C} {h : C ⟶ D} {i : D ⟶ E}
-  (e : exact_seq V [f, g, h, i]) (hf : f = 0) (hi : mono i) : is_iso g :=
-begin
-  apply_with is_iso_of_mono_of_epi {instances:=ff}, { apply_instance },
-  { exact exact.mono_of_eq_zero ((exact_iff_exact_seq _ _).mpr (e.extract 0 2)) hf },
-  { refine exact.epi_of_eq_zero ((exact_iff_exact_seq _ _).mpr (e.extract 1 2)) _, 
-    exact (exact.mono_iff_eq_zero ((exact_iff_exact_seq _ _).mpr (e.extract 2 2))).mp hi } 
-end
-
-lemma injective_of_basis_to_basis_and_injective_on_basis {R : Type*} [ring R] [nontrivial R]
-  {M N : Type*} [add_comm_group M] [add_comm_group N] [module R M] [module R N]
-  {ι ι' : Type*} (bM : basis ι R M) (bN : basis ι' R N) (f : M →ₗ[R] N)
-  (h1 : ∀ i, f (bM i) ∈ set.range bN) (h2 : ∀ i j, f (bM i) = f (bM j) → i = j)
-  : function.injective f := 
-begin
-  rw [← linear_map.ker_eq_bot, linear_map.ker_eq_bot'],
-  intros m hm,
-  rw ← basis.total_repr bM m at ⊢ hm,
-  dsimp [finsupp.total] at hm,
-  simp at hm,
-  rw linear_independent_iff.mp _ (bM.repr m) hm, simp,
-
-  let get_mapped_idx := λ i, classical.some (h1 i),
-  have get_mapped_idx_spec : ∀ i, bN (get_mapped_idx i) = f (bM i) := 
-    λ i, classical.some_spec (h1 i),
-  simp_rw ← get_mapped_idx_spec,
-  apply linear_independent.comp bN.linear_independent,
-  intros i j h,
-  apply h2,
-  exact eq.trans (get_mapped_idx_spec i).symm (eq.trans (congr_arg bN h) (get_mapped_idx_spec j))
-end
-
 -- technically we don't need the nontrivial assumption
 lemma contractible_subspace_homology_of_pair_map_is_iso (R : Type*) [comm_ring R] [nontrivial R] (A X : Top)
   (f : A ⟶ X) (hf : function.injective f)
