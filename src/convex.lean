@@ -16,10 +16,10 @@ begin
   rw metric.is_open_iff at ht1,
   obtain ⟨r, hr1, hr2⟩ := ht1 0 ht3,
   rw absorbent_iff_nonneg_lt, intro x, 
-  have H : 0 ≤ r⁻¹ * (norm x) := mul_nonneg (inv_nonneg.mpr (le_of_lt hr1)) (norm_nonneg x),
-  refine ⟨r⁻¹ * (norm x), H, _⟩,
+  have H : 0 ≤ r⁻¹ * ‖x‖ := mul_nonneg (inv_nonneg.mpr (le_of_lt hr1)) (norm_nonneg x),
+  refine ⟨r⁻¹ * ‖x‖, H, _⟩,
   intros a ha,
-  have H' : 0 < (norm a) := lt_of_le_of_lt H ha,
+  have H' : 0 < ‖a‖ := lt_of_le_of_lt H ha,
   refine ⟨a⁻¹ • x, ht2 (hr2 _), _⟩,
   { rw [mem_ball_zero_iff, norm_smul, mul_comm, norm_inv, mul_inv_lt_iff,
         mul_comm, ← mul_inv_lt_iff, mul_comm], exact ha,
@@ -74,7 +74,7 @@ end.
 
 noncomputable
 def normalize_by (K E : Type*) [is_R_or_C K] [normed_add_comm_group E] [normed_space K E]
-  (f : E → K) := λ x, (f x * ((norm x)⁻¹ : K)) • x
+  (f : E → K) := λ x, (f x * (‖x‖⁻¹ : K)) • x
 
 lemma normalize_by_continuous (K E : Type*) [is_R_or_C K] [normed_add_comm_group E]
   [normed_space K E] (f : E → K) (hf1 : continuous f) (hf2 : f 0 = 0)
@@ -138,7 +138,7 @@ def normalize_by_gauge {E : Type*} [normed_add_comm_group E] [normed_space ℝ E
   := normalize_by ℝ E (gauge s)
 
 lemma norm_of_normalize_by_gauge {E : Type*} [normed_add_comm_group E] [normed_space ℝ E]
-  (s : set E) (x : E) : norm (normalize_by_gauge s x) = gauge s x :=
+  (s : set E) (x : E) : ‖normalize_by_gauge s x‖ = gauge s x :=
 begin
   dsimp only [normalize_by_gauge, normalize_by],
   by_cases x = 0,
@@ -197,14 +197,14 @@ begin
     intros U hU hxU,
     rw metric.is_open_iff at hU,
     obtain ⟨r, hr, H⟩ := hU x hxU,
-    let r' := min r (norm x / 2),
-    have H1 : 0 < norm x,
+    let r' := min r (‖x‖ / 2),
+    have H1 : 0 < ‖x‖,
     { rw norm_pos_iff, intro hx, rw hx at h,
       simp only [gauge_zero, zero_ne_one] at h, exact h },
-    have H2 : 0 < 1 - (norm x)⁻¹ * r',
+    have H2 : 0 < 1 - ‖x‖⁻¹ * r',
     { rw [sub_pos, ← div_eq_inv_mul, div_lt_one_iff],
       left, exact ⟨H1, lt_of_le_of_lt (min_le_right _ _) (half_lt_self H1)⟩ },
-    have : gauge s x < (1 - (norm x)⁻¹ * r')⁻¹,
+    have : gauge s x < (1 - ‖x‖⁻¹ * r')⁻¹,
     { rw h, rw lt_inv, simp only [inv_one, sub_lt_self_iff],
       { refine mul_pos (inv_pos.mpr H1) (lt_min hr (half_pos H1)) },
       { exact zero_lt_one },
@@ -213,7 +213,7 @@ begin
     obtain ⟨r'', ⟨hr1'', hx⟩, hr2''⟩ := exists_lt_of_cInf_lt _ this,
     { refine ⟨r''⁻¹ • x, _, _⟩,
       { refine H _,
-        simp only [metric.mem_ball], refine lt_of_lt_of_le _ (min_le_left r (norm x / 2)), change dist (r''⁻¹ • x) x < r',
+        simp only [metric.mem_ball], refine lt_of_lt_of_le _ (min_le_left r (‖x‖ / 2)), change dist (r''⁻¹ • x) x < r',
         rw [dist_eq_norm, norm_sub_rev],
         rw (_ : x - r''⁻¹ • x = (1 - r''⁻¹) • x), swap, rw [sub_smul, one_smul],
         rw [norm_smul, real.norm_eq_abs, abs_eq_self.mpr],
@@ -224,7 +224,7 @@ begin
             simp only [lower_bounds, set.mem_set_of_eq, and_imp],
             intros a ha _, exact le_of_lt ha },
           { exact ⟨hr1'', hx⟩ } },
-        { rw [← inv_inv (norm x), mul_inv_lt_iff, sub_lt_comm, lt_inv],
+        { rw [← inv_inv ‖x‖, mul_inv_lt_iff, sub_lt_comm, lt_inv],
           exact hr2'', exact H2, exact hr1'', rw inv_pos, exact H1 } },
       { rw set.mem_smul_set_iff_inv_smul_mem₀ at hx, assumption,
         exact ne.symm (ne_of_lt hr1'') } },
@@ -239,13 +239,13 @@ begin
   split; intro h,
   { rw ← norm_eq_zero,
     refine le_antisymm (le_of_not_lt _) (norm_nonneg x),
-    intro h', refine lt_irrefl (norm x) _,
+    intro h', refine lt_irrefl (‖x‖) _,
     obtain ⟨B, hB⟩ := metric.bounded.subset_ball hs₂ 0,
     let B' := |B| + 1,
     have hB' : s ⊆ metric.closed_ball 0 B',
     { refine subset_trans hB (metric.closed_ball_subset_closed_ball _),
       refine le_trans (le_abs_self B) (le_add_of_nonneg_right zero_le_one) },
-    have h'' : 0 < norm x / B',
+    have h'' : 0 < ‖x‖ / B',
     { refine div_pos h' (add_pos_of_nonneg_of_pos (abs_nonneg B) zero_lt_one) },
     rw ← h at h'',
     obtain ⟨r, ⟨hr1, hr2⟩, hr3⟩ := exists_lt_of_cInf_lt (absorbent.gauge_set_nonempty _) h'',
@@ -306,15 +306,15 @@ begin
       { intros z hz h'', 
         simp only [h'', gauge_zero, ne.def, eq_self_iff_true, not_true] at hz,
         exact hz },
-      have H : (norm x)⁻¹ • x = (norm y)⁻¹ • y,
+      have H : ‖x‖⁻¹ • x = ‖y‖⁻¹ • y,
       { refine eq.trans (inv_smul_smul₀ h _).symm (eq.trans _ (inv_smul_smul₀ h' _)),
         refine congr_arg2 _ (congr_arg (λ t, t⁻¹) h4) _,
         rw [smul_smul, smul_smul], exact hxy },
-      suffices : norm x = norm y,
+      suffices : ‖x‖ = ‖y‖,
       { refine eq.trans (smul_inv_smul₀ _ _).symm
                         (eq.trans (congr_arg2 _ this H) (smul_inv_smul₀ _ _));
         rw [norm_ne_zero_iff]; apply_assumption; assumption },
-      have H' : x = (norm x * (norm y)⁻¹) • y,
+      have H' : x = (‖x‖ * ‖y‖⁻¹) • y,
       { rw ← smul_smul, rw inv_smul_eq_iff₀ at H, exact H, rw norm_ne_zero_iff,
         apply_assumption, assumption },
       rw [H', gauge_smul_of_nonneg] at h4,
@@ -331,11 +331,11 @@ begin
       exact h.symm },
     { have h' := h,
       rw ← gauge_eq_zero_iff s h2 h3 at h',
-      refine ⟨⟨norm y • (gauge s y)⁻¹ • y, _⟩, _⟩,
+      refine ⟨⟨‖y‖ • (gauge s y)⁻¹ • y, _⟩, _⟩,
       { have := closure_eq_interior_union_frontier s,
         rw hs₃.is_closed.closure_eq at this,
         rw [interior_eq_gauge_lt_one s hs₁ hs₂, frontier_eq_gauge_one s hs₁ hs₂] at this,
-        suffices H : gauge s (norm y • (gauge s y)⁻¹ • y) ≤ 1,
+        suffices H : gauge s (‖y‖ • (gauge s y)⁻¹ • y) ≤ 1,
         { exact eq.mpr (congr_arg2 _ (refl _) this) (lt_or_eq_of_le H) },
         rw smul_smul,
         rw gauge_smul_of_nonneg (mul_nonneg (norm_nonneg _) (inv_nonneg.mpr (gauge_nonneg _))),
@@ -436,7 +436,7 @@ end.
 noncomputable
 def affine_dim (k : Type*) [division_ring k]
   {E : Type*} [add_comm_group E] [module k E] (s : set E) :=
-  module.rank k ((affine_span k s).direction)
+  module.rank k (affine_span k s).direction
 
 /-
 we will prove that if C is a compact convex set in E with affine dimension n + 1 < ∞ 
@@ -449,7 +449,7 @@ lemma closed_ball_homeo_of_finite_dim (K : Type*) {V W : Type*} [is_R_or_C K]
   : nonempty (metric.closed_ball (0 : V) 1 ≃ₜ metric.closed_ball (0 : W) 1) :=
 begin
   obtain ⟨F⟩ := finite_dimensional.nonempty_continuous_linear_equiv_of_finrank_eq H,
-  let G₁ : metric.closed_ball (0 : V) 1 → metric.closed_ball (0 : W) 1 := λ v, ⟨(norm v.val * (norm (F v.val))⁻¹ : K) • F v.val, _⟩,
+  let G₁ : metric.closed_ball (0 : V) 1 → metric.closed_ball (0 : W) 1 := λ v, ⟨(‖v.val‖ * ‖F v.val‖⁻¹ : K) • F v.val, _⟩,
   swap,
   { rw [mem_closed_ball_zero_iff, norm_smul, norm_mul, norm_inv,
         is_R_or_C.norm_coe_norm, is_R_or_C.norm_coe_norm, mul_assoc],
@@ -457,7 +457,7 @@ begin
     { rw h, rw [norm_zero, zero_mul], exact zero_le_one },
     { rw [inv_mul_cancel, mul_one], exact mem_closed_ball_zero_iff.mp v.property,
       rw norm_ne_zero_iff, exact (linear_equiv.map_ne_zero_iff F.to_linear_equiv).mpr h } },
-  let G₂ : metric.closed_ball (0 : W) 1 → metric.closed_ball (0 : V) 1 := λ v, ⟨(norm v.val * (norm (F.symm v.val))⁻¹ : K) • F.symm v.val, _⟩,
+  let G₂ : metric.closed_ball (0 : W) 1 → metric.closed_ball (0 : V) 1 := λ v, ⟨(‖v.val‖ * ‖F.symm v.val‖⁻¹ : K) • F.symm v.val, _⟩,
   swap,
   { rw [mem_closed_ball_zero_iff, norm_smul, norm_mul, norm_inv,
         is_R_or_C.norm_coe_norm, is_R_or_C.norm_coe_norm, mul_assoc],
@@ -483,9 +483,9 @@ begin
     exact h, exact (linear_equiv.map_ne_zero_iff (continuous_linear_equiv.to_linear_equiv _)).mpr h,
     try { symmetry, apply linear_equiv.apply_symm_apply } },
   -- would love to unify these two in a local helper but typeclasses in `have` are weird
-  { refine continuous.comp (_ : continuous (λ v : V,  ((norm v : K) * ((norm (F v))⁻¹ : K)) • F v))
+  { refine continuous.comp (_ : continuous (λ v : V,  ((‖v‖ : K) * (‖F v‖⁻¹ : K)) • F v))
                            continuous_subtype_val,
-    convert continuous.comp (_ : continuous (λ w : W,  ((norm (F.symm w) : K) * ((norm w)⁻¹ : K)) • w))
+    convert continuous.comp (_ : continuous (λ w : W,  ((‖F.symm w‖ : K) * (‖w‖⁻¹ : K)) • w))
                             F.continuous_to_fun,
     { ext,
       simp only [continuous_linear_equiv.symm_apply_apply, 
@@ -496,9 +496,9 @@ begin
               $ continuous_norm.comp
               $ map_continuous F.symm) },
       { simp only [continuous_linear_equiv.map_zero, norm_zero, algebra_map.coe_zero] } } },
-  { refine continuous.comp (_ : continuous (λ w : W,  ((norm w : K) * ((norm (F.symm w))⁻¹ : K)) • F.symm w))
+  { refine continuous.comp (_ : continuous (λ w : W,  ((‖w‖ : K) * (‖F.symm w‖⁻¹ : K)) • F.symm w))
                            continuous_subtype_val,
-    convert continuous.comp (_ : continuous (λ v : V,  ((norm (F v) : K) * ((norm v)⁻¹ : K)) • v))
+    convert continuous.comp (_ : continuous (λ v : V,  ((‖F v‖ : K) * (‖v‖⁻¹ : K)) • v))
                             F.symm.continuous_to_fun,
     { ext,
       simp only [continuous_linear_equiv.symm_to_linear_equiv,
