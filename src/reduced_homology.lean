@@ -8,8 +8,7 @@ lemma contractible_subspace_homology_of_pair_map_is_iso (R : Type*) [comm_ring R
   (hA : contractible_space A) (n : ℕ) (hn : n > 0)
   : is_iso ((singular_homology_of_base_to_of_pair R n).app (arrow.mk f)) :=
 begin
-  letI := (_ : mono ((singular_chain_complex R).map f)),
-  swap,
+  letI := (_ : mono ((singular_chain_complex R).map f)), swap,
   { apply_with homological_complex.mono_of_eval {instances:=ff}, 
     intro, rw Module.mono_iff_injective, apply singular_chain_complex_map_inj, assumption },
   have : exact_seq _ [↑((homology_functor (Module R) (complex_shape.down ℕ) n).map ((singular_chain_complex R).map f)),
@@ -26,7 +25,6 @@ begin
                                                   n (n - 1) _).extract 0 4,
   swap, { rw complex_shape.down_rel, apply nat.sub_add_cancel, exact hn },
   convert iso_of_four_term_exact_seq_start_zero_end_mono this _ _,
-  { exact category.id_comp _ },
   { apply limits.is_zero.eq_of_src,
     obtain ⟨zero_iso⟩ := homology_of_contractible_space R A hA n hn,
     apply limits.is_zero_of_iso_of_zero (limits.is_zero_zero _),
@@ -76,11 +74,12 @@ lemma singular_homology_connecting_homomorphism_naturality (R : Type*) [comm_rin
   {A B X Y : Top} (f : A ⟶ X) (g : B ⟶ Y) (hf : function.injective f) (hg : function.injective g)
   (p : A ⟶ B) (q : X ⟶ Y) (w : p ≫ g = f ≫ q)
   : (singular_homology_of_pair R (n + 1)).map (arrow.hom_mk' w)
-  ≫ singular_homology_connecting_homomorphism R n g hg
+    ≫ singular_homology_connecting_homomorphism R n g hg
   = singular_homology_connecting_homomorphism R n f hf
-  ≫ (singular_homology R n).map p :=
+    ≫ (singular_homology R n).map p :=
 begin
-  dsimp [singular_homology, singular_homology_of_pair, singular_homology_connecting_homomorphism],
+  dsimp only [singular_homology, singular_homology_of_pair, 
+              singular_homology_connecting_homomorphism],
   symmetry,
   have w' : (singular_chain_complex R).map f ≫ (singular_chain_complex R).map q
           = (singular_chain_complex R).map p ≫ (singular_chain_complex R).map g,
@@ -90,7 +89,7 @@ begin
   exact (coker_functor_proj (chain_complex (Module R) ℕ)).naturality (arrow.hom_mk' w'.symm)
 end.
 
-lemma contractible_space_connecting_homomorphism_is_iso (R : Type*) [comm_ring R] [nontrivial R]
+lemma contractible_space_connecting_homomorphism_is_iso (R : Type*) [comm_ring R]
   (A X : Top) (f : A ⟶ X) (hf : function.injective f)
   (hX : contractible_space X) (n : ℕ) (hn : n > 0)
   : is_iso (singular_homology_connecting_homomorphism R n f hf) :=

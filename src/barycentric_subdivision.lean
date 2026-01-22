@@ -12,19 +12,19 @@ open_locale nnreal big_operators
 section subcomplexes_with_indexing
 
 -- weird universe issues without being explicit :(
-universes u v w p
+universes u v w
 
-def spanned_by_sat (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid M] [module R M]
+def spanned_by_sat (R : Type*) [semiring R] (M : Type*) [add_comm_monoid M] [module R M]
                    {ι : Type*} (b : basis ι R M) (s : set ι)
                    : submodule R M :=
   submodule.span R (b '' s)
 
-lemma basis.mem_spanned_by_sat {R : Type*} [comm_ring R] {M : Type*} [add_comm_monoid M] [module R M]
+lemma basis.mem_spanned_by_sat {R : Type*} [semiring R] {M : Type*} [add_comm_monoid M] [module R M]
                    {ι : Type*} (b : basis ι R M) {s : set ι} {x : M}
                    : x ∈ spanned_by_sat R M b s ↔ ∀ i, b.repr x i ≠ 0 → i ∈ s :=
-b.mem_span_image_iff
+  b.mem_span_image_iff
 
-lemma basis.map_repr_spanned_by_sat {R M ι : Type*} [comm_ring R] [add_comm_monoid M] [module R M]
+lemma basis.map_repr_spanned_by_sat {R M ι : Type*} [semiring R] [add_comm_monoid M] [module R M]
   (b : basis ι R M) (s : set ι) :
   (spanned_by_sat R M b s).map (b.repr : M →ₗ[R] (ι →₀ R)) = finsupp.supported R R s :=
 begin
@@ -38,56 +38,56 @@ lemma finsupp.subtype_domain_single {α : Type*} {M : Type*} [has_zero M]
 begin
   rw finsupp.eq_single_iff,
   split,
-  { rintros ⟨a', _⟩ h, simp at h ⊢, have h' := finsupp.single_apply_ne_zero.mp h, exact h'.left },
-  { simp }
+  { rintros ⟨a', _⟩ h, 
+    simp only [finset.mem_singleton, finsupp.mem_support_iff, 
+               finsupp.subtype_domain_apply, ne.def] at h ⊢,
+    exact (finsupp.single_apply_ne_zero.mp h).left },
+  { simp only [finsupp.subtype_domain_apply, finsupp.single_eq_same] }
 end
 
--- lemma finsupp.subtype_domain_desc {α : Type*} {M : Type*} [has_zero M]
---   (p : α → Prop) [decidable_pred p] (a : α) (m : M)
---   : finsupp.subtype_domain p (finsupp.single a m)
---   = if h : p a then finsupp.single ⟨a, h⟩ m else 0 :=
--- begin
---   split_ifs,
---   { exact finsupp.subtype_domain_single p a h m },
---   { rw finsupp.subtype_domain_eq_zero_iff',
---     intros x hx, apply finsupp.single_eq_of_ne,
---     intro hax, rw hax at h, contradiction }
--- end
-
 noncomputable
-def spanned_by_sat_basis (R : Type u) [comm_ring R] (M : Type w) [add_comm_monoid M] [module R M]
-                         {ι : Type p} (b : basis ι R M) (s : set ι)
+def spanned_by_sat_basis (R : Type u) [semiring R] (M : Type w) [add_comm_monoid M] [module R M]
+                         {ι : Type*} (b : basis ι R M) (s : set ι)
                          : basis s R (spanned_by_sat R M b s) :=
-{ repr := (b.repr.submodule_map _).trans ((linear_equiv.of_eq _ _ (b.map_repr_spanned_by_sat s)).trans
-    (finsupp.supported_equiv_finsupp s)) }
+{ repr := (b.repr.submodule_map _).trans
+        $ (linear_equiv.of_eq _ _ (b.map_repr_spanned_by_sat s)).trans
+        $ finsupp.supported_equiv_finsupp s }
 
-lemma spanned_by_sat_basis_apply (R : Type*) [comm_ring R] (M : Type*) [add_comm_monoid M] [module R M]
-  {ι : Type p} (b : basis ι R M) (s : set ι) (i : s) :
-  spanned_by_sat_basis R M b s i = ⟨b i, submodule.subset_span (set.mem_image_of_mem b i.2)⟩ :=
+lemma spanned_by_sat_basis_apply (R : Type*) [semiring R] (M : Type*) [add_comm_monoid M] [module R M]
+  {ι : Type*} (b : basis ι R M) (s : set ι) (i : s)
+  : spanned_by_sat_basis R M b s i 
+  = ⟨b i, submodule.subset_span (set.mem_image_of_mem b i.2)⟩ :=
 begin
-  apply subtype.eq, simp [spanned_by_sat_basis]
+  apply subtype.eq, 
+  simp only [spanned_by_sat_basis, basis.coe_of_repr, linear_equiv.trans_symm, 
+             linear_equiv.of_eq_symm, linear_equiv.trans_apply, 
+             subtype.val_eq_coe, linear_equiv.submodule_map_symm_apply, 
+             linear_equiv.coe_of_eq_apply, basis.repr_symm_apply,
+             finsupp.supported_equiv_finsupp_symm_apply_coe, one_smul, 
+             finsupp.total_single, finsupp.map_domain_single]
 end
 
 def subcomplex_spanned_by (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}
                           (C : homological_complex (Module.{w} R) c)
-                          {ι : ι' → Type p} (b : Π (i : ι'), basis (ι i) R (C.X i))
+                          {ι : ι' → Type*} (b : Π (i : ι'), basis (ι i) R (C.X i))
                           (s : Π (i : ι'), set (ι i))
                           (s_mono : Π i j, c.rel i j →
                             submodule.map (C.d i j) (spanned_by_sat R (C.X i) (b i) (s i))
                             ≤ spanned_by_sat R (C.X j) (b j) (s j))
                           : homological_complex (Module.{w} R) c := 
-  Module.subcomplex_of_compatible_submodules C (λ i, spanned_by_sat R (C.X i) (b i) (s i))
-                                                                    (by { rintros i j y ⟨x, ⟨hx, h⟩⟩,
-                                                                          subst h,
-                                                                          by_cases c.rel i j,
-                                                                          { exact s_mono i j h (submodule.mem_map_of_mem hx) },
-                                                                          { rw C.shape' i j h, simp } })
+  Module.subcomplex_of_compatible_submodules C
+    (λ i, spanned_by_sat R (C.X i) (b i) (s i))
+    (by { rintros i j y ⟨x, ⟨hx, h⟩⟩,
+          subst h,
+          by_cases c.rel i j,
+          { exact s_mono i j h (submodule.mem_map_of_mem hx) },
+          { rw C.shape' i j h, simp only [linear_map.zero_apply, submodule.zero_mem] } })
 
 def subcomplex_spanned_by_map
   (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}
   (C1 C2 : homological_complex (Module.{w} R) c)
   (f : C1 ⟶ C2)
-  {ι1 ι2 : ι' → Type p}
+  {ι1 ι2 : ι' → Type*}
   (b1 : Π (i : ι'), basis (ι1 i) R (C1.X i))
   (b2 : Π (i : ι'), basis (ι2 i) R (C2.X i))
   (s1 : Π (i : ι'), set (ι1 i)) (s2 : Π (i : ι'), set (ι2 i))
@@ -115,7 +115,7 @@ def subcomplex_spanned_by_map_inj
   (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}
   (C1 C2 : homological_complex (Module.{w} R) c)
   (f : C1 ⟶ C2)
-  {ι1 ι2 : ι' → Type p}
+  {ι1 ι2 : ι' → Type*}
   (b1 : Π (i : ι'), basis (ι1 i) R (C1.X i))
   (b2 : Π (i : ι'), basis (ι2 i) R (C2.X i))
   (s1 : Π (i : ι'), set (ι1 i)) (s2 : Π (i : ι'), set (ι2 i))
@@ -140,7 +140,7 @@ def subcomplex_spanned_by_map_comp
   (R : Type u) [comm_ring R] {ι' : Type*} {c : complex_shape ι'}
   (C1 C2 C3 : homological_complex (Module.{w} R) c)
   (f : C1 ⟶ C2) (g : C2 ⟶ C3) 
-  {ι1 ι2 ι3 : ι' → Type p}
+  {ι1 ι2 ι3 : ι' → Type*}
   (b1 : Π (i : ι'), basis (ι1 i) R (C1.X i))
   (b2 : Π (i : ι'), basis (ι2 i) R (C2.X i))
   (b3 : Π (i : ι'), basis (ι3 i) R (C3.X i))
@@ -193,7 +193,7 @@ begin
     refine (submodule.map_span_le _ _ _).mpr _,
     rintros C ⟨⟨i, σ⟩, ⟨s, H, hσ⟩, h⟩, subst h, cases i,
     rw ← simplex_to_chain_is_basis,
-    dsimp [simplex_to_chain],
+    dsimp only [simplex_to_chain],
     rw singular_chain_complex_differential_desc,
     refine submodule.sum_mem _ _,
     intros k _,
@@ -304,7 +304,7 @@ lemma bounded_diam_submodule_monotone (R : Type) [comm_ring R] {X : Type*} [pseu
   (ε δ : ℝ≥0) (h : ε ≤ δ) (n : ℕ)
   : bounded_diam_submodule R X ε n ≤ bounded_diam_submodule R X δ n :=
 begin
-  dsimp [bounded_diam_submodule],
+  dsimp only [bounded_diam_submodule],
   apply bounded_by_submodule_refinement,
   rintros s ⟨hs1, hs2⟩,
   exact ⟨s, ⟨hs1, le_trans hs2 (nnreal.coe_le_coe.mpr h)⟩, subset_refl s⟩
@@ -328,9 +328,9 @@ lemma subset_subcomplex_monotone (R : Type*) [comm_ring R]
   {X : Type*} [topological_space X] (S T : set X) (h : S ⊆ T) (n : ℕ) 
   : subset_submodule R X S n ≤ subset_submodule R X T n :=
 begin
-  dsimp [subset_submodule],
+  dsimp only [subset_submodule],
   apply bounded_by_submodule_refinement,
-  simp, assumption
+  simpa only [set.mem_singleton_iff, exists_eq_left, forall_eq]
 end
 
 lemma subset_subcomplex_univ (R : Type*) [comm_ring R] {X : Type*} [topological_space X] (n : ℕ)
@@ -339,7 +339,10 @@ begin
   refine eq.trans _ ((singular_chain_complex_basis R n).spanning _),
   dsimp [subset_submodule, bounded_by_submodule, spanned_by_sat],
   congr,
-  ext, simp, split,
+  ext, 
+  simp only [exists_eq_left, set.subset_univ, set.set_of_true, set.image_univ, 
+             set.mem_range, sigma.exists, set.mem_set_of_eq],
+  split,
   { rintro ⟨b, σ, hσ⟩, subst hσ, existsi unit.star, existsi σ,
     refine eq.trans (singular_chain_complex_map R n σ (𝟙 (Top.of (topological_simplex n)))) _,
     dsimp [singular_chain_complex_basis, functor_basis.get_basis],
@@ -359,16 +362,19 @@ lemma singular_chain_complex_map_subset_subcomplex (R : Type*) [comm_ring R]
   ≤ subset_submodule R Y (f '' S) n :=
 begin
   refine (submodule.map_span_le _ _ _).mpr _,
-  rintros C ⟨⟨i, σ⟩, ⟨s, hs, hσ⟩, h'⟩, cases i, simp at hs, subst hs,
+  rintros C ⟨⟨i, σ⟩, ⟨s, hs, hσ⟩, h'⟩, cases i, 
+  simp only [set.mem_singleton_iff] at hs, subst hs,
   refine submodule.subset_span _,
   refine exists.intro ⟨(), σ ≫ f⟩ _,
-  simp [Top.to_sSet'], split,
+  simp only [set.mem_singleton_iff, exists_eq_left, set.mem_set_of_eq], 
+  split,
   { transitivity f '' set.range σ,
     { exact subset_of_eq (set.range_comp _ _) },
     { exact set.image_subset f hσ } },
   { symmetry, rw ← h', 
-    dsimp [functor_basis.get_basis], rw [basis.mk_apply, basis.mk_apply],
-    dsimp [singular_chain_complex_basis, functor_basis.get_basis, simplex_to_chain],
+    dsimp only [functor_basis.get_basis], 
+    rw [basis.mk_apply, basis.mk_apply],
+    dsimp [singular_chain_complex_basis, simplex_to_chain],
     rw [singular_chain_complex_map, singular_chain_complex_map, singular_chain_complex_map],
     refl }
 end
@@ -377,29 +383,11 @@ lemma subset_subcomplex_le_bounded_by_subcomplex (R : Type*) [comm_ring R] {X : 
   [topological_space X] (cov : set (set X)) (s : set X) (hs : s ∈ cov) (n : ℕ)
   : subset_submodule R X s n ≤ bounded_by_submodule R cov n :=
 begin
-  dsimp [subset_submodule],
+  dsimp only [subset_submodule],
   apply bounded_by_submodule_refinement,
-  simp,
+  simp only [set.mem_singleton_iff, forall_eq],
   exact ⟨s, hs, subset_refl s⟩
 end 
-
-lemma metric.lebesgue_number_lemma {M : Type*} [pseudo_metric_space M] (hCompact : compact_space M)
-  (cov : set (set M)) (cov_open : ∀ s, s ∈ cov → is_open s) (hcov : ⋃₀ cov = ⊤)
-  (cov_nonempty : cov.nonempty) -- if M is empty this can happen!
-  : ∃ δ : ℝ≥0, 0 < δ ∧ (∀ S : set M, metric.diam S < δ → ∃ U, U ∈ cov ∧ S ⊆ U) :=
-  match lebesgue_number_lemma_sUnion (is_compact_univ_iff.mpr hCompact) cov_open (set.univ_subset_iff.mpr hcov) with
-  | ⟨n, H, hn⟩ := match metric.mem_uniformity_dist.mp H with 
-                 | ⟨ε, ε_pos, hε⟩ := ⟨ε.to_nnreal, real.to_nnreal_pos.mpr ε_pos, λ S hS, 
-                   match em S.nonempty with
-                   | or.inl ⟨x, hx⟩ := match hn x (set.mem_univ x) with
-                                      | ⟨U, hU, hU'⟩ := ⟨U, hU, λ y hy, hU' y (@hε x y (lt_of_le_of_lt (metric.dist_le_diam_of_mem metric.bounded_of_compact_space hx hy) (lt_of_lt_of_eq hS (real.coe_to_nnreal _ (le_of_lt ε_pos)))))⟩
-                                      end
-                   | or.inr h'      := match cov_nonempty with
-                                       | ⟨U, hU⟩ := ⟨U, hU, λ y hy, false.elim (eq.subst (set.not_nonempty_iff_eq_empty.mp h') hy : y ∈ (∅ : set M))⟩
-                                       end
-                   end⟩
-                 end
-  end
 
 end subcomplexes
 
@@ -416,25 +404,27 @@ def convex_combination {ι' : Type} [fintype ι'] [nonempty ι']
 
 lemma convex_combination_partial_app_lipschitz {ι' : Type} [fintype ι'] [nonempty ι']
   (vertices : ι' → D)
-  : lipschitz_with (fintype.card ι' * ∥subtype.val ∘ vertices∥₊) (convex_combination vertices) :=
+  : lipschitz_with (fintype.card ι' * ‖subtype.val ∘ vertices‖₊) (convex_combination vertices) :=
 begin
   rw lipschitz_with_iff_dist_le_mul, intros x y,
   rw [subtype.dist_eq, dist_eq_norm],
-  simp [convex_combination],
+  simp only [convex_combination, subtype.val_eq_coe, subtype.coe_mk, 
+             nonneg.coe_mul, nnreal.coe_nat_cast, coe_nnnorm],
   rw ← finset.sum_sub_distrib,
   refine le_trans (norm_sum_le _ _) _,
   convert le_of_eq_of_le (congr_arg finset.univ.sum (funext (λ i, congr_arg norm (sub_smul (x.val i) (y.val i) (vertices i).val).symm))) _,
   refine le_of_eq_of_le (congr_arg finset.univ.sum (funext (λ i, norm_smul _ _))) _,
-  refine le_trans (finset.sum_le_sum (λ i _, mul_le_mul (le_refl ∥x.val i - y.val i∥) (norm_le_pi_norm (subtype.val ∘ vertices) i) (norm_nonneg _) (norm_nonneg _))
-                  : finset.univ.sum (λ i, ∥x.val i - y.val i∥ * ∥(vertices i).val∥)
-                  ≤ finset.univ.sum (λ i, ∥x.val i - y.val i∥ * ∥subtype.val ∘ vertices∥)) _,
+  refine le_trans (finset.sum_le_sum (λ i _, mul_le_mul (le_refl ‖x.val i - y.val i‖) (norm_le_pi_norm (subtype.val ∘ vertices) i) (norm_nonneg _) (norm_nonneg _))
+                  : finset.univ.sum (λ i, ‖x.val i - y.val i‖ * ‖(vertices i).val‖)
+                  ≤ finset.univ.sum (λ i, ‖x.val i - y.val i‖ * ‖subtype.val ∘ vertices‖)) _,
   rw ← finset.sum_mul,
   rw mul_right_comm, apply mul_le_mul,
-  { dsimp [fintype.card],
-    convert le_of_le_of_eq _ (@finset.sum_const _ _ (@finset.univ ι' _) _ (dist x y)), simp,
+  { dsimp only [fintype.card],
+    convert le_of_le_of_eq _ (@finset.sum_const _ _ (@finset.univ ι' _) _ (dist x y)), 
+    simp only [nsmul_eq_mul],
     apply finset.sum_le_sum,
     intros i _,
-    rw [← real.dist_eq, subtype.dist_eq],
+    rw [real.norm_eq_abs, ← real.dist_eq, subtype.dist_eq],
     apply dist_le_pi_dist },
   { refl },
   { apply norm_nonneg },
@@ -467,17 +457,22 @@ lemma simplex_category.to_Top'_map_comp_affine
 begin
   ext p k, 
   delta simplex_category.to_Top',
-  dsimp [continuous_map.has_coe_to_fun],
+  dsimp only [continuous_map.has_coe_to_fun, finset.sum_ite_eq', finset.mem_univ,
+              if_true, Top.id_app, finset.pairwise_disjoint_coe, finset.coe_filter, 
+              finset.coe_univ, set.sep_univ, set.mem_set_of_eq, set.mem_preimage, 
+              set.mem_singleton_iff, finset.mem_bUnion, finset.mem_filter, 
+              true_and, exists_prop, exists_eq_right'],
   simp only [simplex_category.to_Top'_map, singular_simplex_of_vertices],
   dsimp [continuous_map.has_coe_to_fun, convex_combination],
-  simp, simp_rw finset.sum_mul,
+  simp only [fintype.sum_apply, pi.smul_apply, algebra.id.smul_eq_mul], 
+  simp_rw finset.sum_mul,
   refine eq.trans _ 
          (@finset.sum_fiberwise_of_maps_to _ _ _ _ _ finset.univ finset.univ
                                            f (λ _ _, finset.mem_univ _)
                                            (λ t, p.val t * (vertices (f t)).val k)),
   congr, ext j,
   apply finset.sum_congr,
-  { ext i, simp },
+  { refl },
   { intros t ht, simp at ht, rw ← ht, refl }
 end
 
@@ -493,32 +488,33 @@ def affine_subcomplex (R : Type*) [comm_ring R] : chain_complex (Module R) ℕ :
   subcomplex_spanned_by R ((singular_chain_complex R).obj (Top.of D))
                         (λ n, (singular_chain_complex_basis R n).get_basis (Top.of D))
                         (λ n, { σ | ∃ vs : fin (n + 1) → D, σ.2 = singular_simplex_of_vertices vs })
-                        (by { intros i j h, simp at h, subst h,
-                              refine (submodule.map_span_le _ _ _).mpr _,
-                              rintros C ⟨⟨i, σ⟩, ⟨vs, hvs⟩, h⟩, subst h, cases i, dsimp at hvs,
-                              subst hvs,
-                              dsimp [singular_chain_complex_basis, functor_basis.get_basis],
-                              rw [basis.mk_apply],
-                              dsimp [simplex_to_chain],
-                              rw [singular_chain_complex_map],
-                              rw singular_chain_complex_differential_desc,
-                              simp_rw zsmul_eq_smul_cast R,
-                              refine submodule.sum_smul_mem _ _ _,
-                              intros i _,
-                              refine submodule.subset_span _,
-                              refine ⟨⟨(), simplex_category.to_Top'.map (simplex_category.δ i)
-                                          ≫ 𝟙 (Top.of (topological_simplex (j + 1)))
-                                          ≫ singular_simplex_of_vertices vs⟩, _⟩,
-                              rw basis.mk_apply,
-                              split,
-                              { existsi (λ j, vs (simplex_category.δ i j)),
-                                simp,
-                                rw @category_theory.category.id_comp Top _
-                                                                     (Top.of (topological_simplex (j + 1)))
-                                                                     (Top.of D)
-                                                                     (singular_simplex_of_vertices vs),
-                                apply simplex_category.to_Top'_map_comp_affine },
-                              { apply singular_chain_complex_map } })
+                        $ by { 
+    intros i j h, simp only [complex_shape.down_rel] at h, subst h,
+    refine (submodule.map_span_le _ _ _).mpr _,
+    rintros C ⟨⟨i, σ⟩, ⟨vs, hvs⟩, h⟩, subst h, cases i, dsimp at hvs,
+    subst hvs,
+    dsimp only [singular_chain_complex_basis, functor_basis.get_basis],
+    rw [basis.mk_apply],
+    dsimp [simplex_to_chain],
+    rw [singular_chain_complex_map],
+    rw singular_chain_complex_differential_desc,
+    simp_rw zsmul_eq_smul_cast R,
+    refine submodule.sum_smul_mem _ _ _,
+    intros i _,
+    refine submodule.subset_span _,
+    refine ⟨⟨(), simplex_category.to_Top'.map (simplex_category.δ i)
+                ≫ 𝟙 (Top.of (topological_simplex (j + 1)))
+                ≫ singular_simplex_of_vertices vs⟩, _⟩,
+    rw basis.mk_apply,
+    split,
+    { existsi (λ j, vs (simplex_category.δ i j)),
+      simp_rw @category_theory.category.id_comp Top _
+                                                (Top.of (topological_simplex (j + 1)))
+                                                (Top.of D)
+                                                (singular_simplex_of_vertices vs),
+      apply simplex_category.to_Top'_map_comp_affine },
+    { apply singular_chain_complex_map } 
+  }
 
 lemma affine_submodule_eq_affine_submodule (R : Type*) [comm_ring R] (n : ℕ)
   : (affine_subcomplex R).X n = Module.of R (affine_submodule R n) := rfl
@@ -529,9 +525,10 @@ lemma bounded_diam_subcomplex_le_cover_subcomplex
   (cov_nonempty : cov.nonempty) (n : ℕ)
   : ∃ δ, 0 < δ ∧ bounded_diam_submodule R D δ n ≤ bounded_by_submodule R cov n :=
 begin
-  obtain ⟨δ, hδ, Hδ⟩ := metric.lebesgue_number_lemma (is_compact_iff_compact_space.mp hCompact) cov
-                                                    cov_open hcov cov_nonempty,
-  refine ⟨δ/2, nnreal.half_pos hδ, _⟩,
+  obtain ⟨δ, hδ⟩ := lebesgue_number_lemma_of_metric hCompact cov_open,
+  -- obtain ⟨δ, hδ, Hδ⟩ := metric.lebesgue_number_lemma (is_compact_iff_compact_space.mp hCompact) cov
+  --                                                   cov_open hcov cov_nonempty,
+  refine ⟨δ/2, half_pos hδ, _⟩,
   refine submodule.span_le.mpr _,
   rintros C ⟨⟨i, vs⟩, ⟨s, hs, hvs⟩, H⟩, subst H, cases i,
   refine submodule.subset_span _,
@@ -586,27 +583,35 @@ begin
     rw ← finset.sum_smul,
     refine eq.trans (one_smul _ _).symm (congr_arg2 _ _ rfl),
     exact p.property.right.symm },
-  transitivity ∥finset.univ.sum (λ (i : fin (n + 1)), p.val i • (x0.val - (vertices i).val))∥,
+  transitivity ‖finset.univ.sum (λ (i : fin (n + 1)), p.val i • (x0.val - (vertices i).val))‖,
   { apply le_of_eq, apply congr_arg,
     refine eq.trans _ (congr_arg _ (funext (λ i, (smul_sub (p.val i) x0.val (vertices i).val).symm))),
     refine eq.trans _ finset.sum_sub_distrib.symm,
     exact congr_arg2 _ (congr_arg subtype.val this) rfl, },
   { refine le_trans (norm_sum_le _ _) _,
     simp_rw [norm_smul],
-    let d := ⨆ (i : fin (n + 1)), dist x0 (vertices i),
-    have d_spec : ∀ j, ∥x0.val - (vertices j).val∥ ≤ d,
-    { intro j,
+    generalize h : (⨆ (i : fin (n + 1)), dist x0 (vertices i)) = d,
+    have d_spec : ∀ j, ‖x0.val - (vertices j).val‖ ≤ d,
+    { subst h, intro j,
       rw [← dist_eq_norm, subtype.val_eq_coe, subtype.val_eq_coe,
           ← subtype.dist_eq x0 (vertices j)],
       refine le_csupr _ j,
       apply finite_is_bounded, apply set.finite_range },
-    convert (finset.sum_le_sum (λ i _, mul_le_mul (le_refl ∥p.val i∥) (d_spec i)
-                                                  (norm_nonneg _) (norm_nonneg _))),
-    rw ← finset.sum_mul,
-    simp_rw [real.norm_eq_abs],
-    symmetry, convert one_mul d, 
-    convert p.property.right,
-    ext, simp, apply p.property.left }
+    
+    refine le_trans (finset.sum_le_sum (λ i _, mul_le_mul_of_nonneg_left (d_spec i) (norm_nonneg _))) _,
+
+    -- have := finset.sum_le_sum (λ i _, mul_le_mul (le_refl ‖p.val i‖) (d_spec i)
+    --                                              (norm_nonneg _) (norm_nonneg _)),
+    -- refine le_trans (finset.sum_le_sum (λ i _, _)) _,
+    -- convert (finset.sum_le_sum (λ i _, mul_le_mul (le_refl ‖p.val i‖) (d_spec i)
+    --                                               (norm_nonneg _) (norm_nonneg _))),
+    -- rw ← finset.sum_mul,
+
+    squeeze_simp [real.norm_eq_abs],
+    -- symmetry, convert one_mul d, 
+    -- convert p.property.right,
+    -- ext, simp, apply p.property.left
+     }
 end
 
 -- This should probably be used in other places
@@ -630,7 +635,7 @@ lemma singular_simplex_of_vertices_bounded {n : ℕ} (vertices : fin (n + 1) →
   : @metric.bounded D _ (set.range (singular_simplex_of_vertices vertices)) :=
 begin
   rw metric.bounded_range_iff,
-  existsi (((n + 1 : ℝ) * ∥subtype.val ∘ vertices∥) * metric.diam (topological_simplex n)),
+  existsi (((n + 1 : ℝ) * ‖subtype.val ∘ vertices‖) * metric.diam (topological_simplex n)),
   intros x y,
   refine le_trans ((convex_combination_partial_app_lipschitz vertices).dist_le_mul x y) _,
   refine mul_le_mul (le_of_eq _) _ _ _,
@@ -761,7 +766,7 @@ begin
   dsimp [convex.barycenter', singular_simplex_of_vertices, convex_combination],
   refine le_of_eq_of_le (congr_arg norm finset.sum_sub_distrib.symm) _,
   dsimp [barycenter],
-  transitivity ((n + 1)⁻¹ : ℝ) * ∥finset.univ.sum (λ j : fin (n + 1), (vertices j).val - (vertices i).val)∥,
+  transitivity ((n + 1)⁻¹ : ℝ) * ‖finset.univ.sum (λ j : fin (n + 1), (vertices j).val - (vertices i).val)‖,
   { apply le_of_eq,
     rw ← abs_eq_self.mpr (_ : 0 ≤ (n + 1 : ℝ)),
     swap, norm_cast, apply zero_le,
